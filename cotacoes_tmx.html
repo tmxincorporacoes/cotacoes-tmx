@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TMX · Mapa de Cotação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Visual no padrão do Obra Prima: barra e menu azuis, destaque laranja, conteúdo branco */
+:root{
+  --azul:#2d5f8b; --azul-esc:#25527a; --azul-cl:#e4edf5; --laranja:#eba040; --laranja-esc:#c9821f;
+  --bg:#f4f6f8; --surface:#ffffff; --ink:#1f2d3a; --muted:#5c6b78; --line:#d9e0e6;
+  --ok:#1b6f45; --ok-bg:#dff1e6; --warn:#8a5200; --warn-bg:#fbecd0; --err:#a3262f; --err-bg:#f9dcdf; --none:#5d6e73; --none-bg:#e6ebed;
+  --font:'Montserrat',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:14px/1.5 var(--font);color:var(--ink);background:var(--bg);min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--laranja);outline-offset:2px}
+
+.topo{background:var(--azul);color:#fff;height:56px;display:flex;align-items:center;gap:16px;padding:0 20px;position:sticky;top:0;z-index:20}
+.topo h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.01em}
+.topo .sel{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.8rem}
+.topo .btn{background:transparent;border-color:rgba(255,255,255,.65);color:#fff}
+.topo .btn:hover{background:var(--azul-esc);border-color:#fff}
+.selo{background:var(--laranja);color:#2b1a00;font-weight:700;font-size:.7rem;padding:3px 8px;border-radius:12px;letter-spacing:.04em}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh - 56px)}
+.menu{background:var(--azul);padding:14px 10px;display:flex;flex-direction:column;gap:4px}
+.menu button{background:none;border:0;color:#fff;text-align:left;padding:10px 14px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem}
+.menu button:hover{background:var(--azul-esc)}
+.menu button.ativo{background:#fff;color:var(--azul)}
+main{padding:24px;min-width:0;display:flex;flex-direction:column;gap:22px}
+@media (max-width:820px){.layout{grid-template-columns:1fr}.menu{flex-direction:row;overflow-x:auto;padding:8px}.menu button{white-space:nowrap}main{padding:16px}}
+
+h2{font-size:1.25rem;margin:0}
+h3{font-size:1rem;margin:0 0 6px}
+.sub{color:var(--muted);font-size:.85rem}
+.linha{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.espaco{margin-left:auto}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-weight:600;font-size:.85rem;cursor:pointer}
+.btn:hover{border-color:var(--azul)}
+.btn.prim{background:var(--azul);border-color:var(--azul);color:#fff}
+.btn.prim:hover{background:var(--azul-esc)}
+.btn.lar{background:var(--laranja);border-color:var(--laranja);color:#2b1a00}
+.btn.pq{padding:4px 9px;font-size:.78rem}
+.btn.perigo{color:var(--err)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.cartao{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
+.vazio{background:var(--surface);border:1px dashed var(--line);border-radius:8px;padding:28px;text-align:center;color:var(--muted)}
+
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{text-align:left;padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
+thead th{border-top:0;background:var(--bg);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+tr.clicavel{cursor:pointer}tr.clicavel:hover td{background:var(--azul-cl)}
+.rolagem{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+td input,td select{width:100%;border:1px solid var(--line);border-radius:4px;padding:5px 7px;background:#fff}
+td input.n{width:90px;text-align:right}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.abas{display:flex;gap:2px;border-bottom:2px solid var(--line)}
+.abas button{background:none;border:0;padding:9px 18px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.abas button.ativo{color:var(--azul);border-bottom-color:var(--azul)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.card.dest{background:var(--azul-cl);border-color:transparent}
+.card .k{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card .grande{font:600 1.55rem/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.card .ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:.8rem;border-top:1px solid var(--line);padding-top:8px}
+.card .ctl label{display:flex;gap:6px;align-items:center}
+.card .ctl input[type=number]{width:74px;border:1px solid var(--line);border-radius:4px;padding:3px 6px}
+.card .ctl label{max-width:100%;min-width:0}
+.card .ctl select{flex:1 1 140px;min-width:0;max-width:100%;border:1px solid var(--line);border-radius:4px;padding:3px 6px;text-overflow:ellipsis}
+
+.chip{display:inline-block;font-size:.66rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:3px}
+.chip.confere{color:var(--ok);background:var(--ok-bg)}
+.chip.confirmar{color:var(--warn);background:var(--warn-bg)}
+.chip.manual{color:var(--azul);background:var(--azul-cl);outline:1px solid var(--azul)}
+.chip.sem_cotacao,.chip.none{color:var(--none);background:var(--none-bg)}
+.chip.erro{color:var(--err);background:var(--err-bg)}
+
+.mapa{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow-x:auto}
+.mapa .grade{display:grid;min-width:max-content}
+.mapa .c{padding:10px;border-top:1px solid var(--line);min-width:0}
+.mapa .cab{background:var(--bg);font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-top:0;position:sticky;top:0}
+.mapa .n{font:500 .85rem var(--mono);color:var(--muted)}
+.mapa .rod{background:var(--bg);font-weight:600}
+.mapa .melhor{background:var(--azul-cl)}
+.oc-desc{font-weight:600}
+.qtd{font:400 .78rem var(--mono);color:var(--muted);margin-top:3px}
+.topo-cel{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-bottom:5px}
+.menor{font-size:.76rem;font-weight:700;color:var(--azul)}.menor.alerta{color:var(--warn)}
+.desc{font-size:.8rem;overflow-wrap:anywhere}.cod{font-family:var(--mono);color:var(--muted)}
+.din{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin-top:3px}
+.din strong{font:600 1rem var(--mono);font-variant-numeric:tabular-nums}
+.calc{font:400 .74rem var(--mono);color:var(--muted)}
+.nota{font-size:.76rem;color:var(--muted);margin-top:3px}
+.acoes-cel{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
+.acoes-cel select{max-width:100%;font-size:.76rem;border:1px solid var(--line);border-radius:4px;padding:3px 5px;background:#fff}
+.acoes-cel input{width:56px;font-size:.76rem;border:1px solid var(--line);border-radius:4px;padding:3px 5px}
+
+.alertas{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.alertas li{padding:11px 16px;display:grid;gap:2px}
+.alertas li+li{border-top:1px solid var(--line)}
+.alertas span{color:var(--muted);font-size:.85rem}
+.alertas li.erro b{color:var(--err)}.alertas li.aviso b{color:var(--warn)}
+
+#modal{position:fixed;inset:0;background:rgba(15,30,45,.5);display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;z-index:50;overflow:auto}
+#modal.aberto{display:flex}
+#modal .caixa{background:#fff;border-radius:10px;max-width:980px;width:100%;padding:22px;display:flex;flex-direction:column;gap:14px}
+#modal textarea{width:100%;min-height:150px;font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:6px;padding:8px}
+#modal input[type=text],#modal select{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:#fff}
+.campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.campos label{display:flex;flex-direction:column;gap:3px;font-size:.78rem;font-weight:600;color:var(--muted)}
+.pdf-lateral{position:fixed;top:56px;right:0;bottom:0;width:min(46vw,640px);background:#fff;border-left:2px solid var(--azul);z-index:30;display:flex;flex-direction:column}
+.pdf-lateral header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--azul);color:#fff;font-weight:600;font-size:.85rem}
+.pdf-lateral iframe{flex:1;border:0;width:100%}
+#aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;display:none;z-index:60;max-width:90vw}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>TMX · Mapa de Cotação</h1>
+  <div class="sel"><span id="ocupado" style="display:none;font-size:.75rem">Sincronizando…</span><span class="selo" id="selo"></span>
+    <button class="btn pq" data-acao="conexao">Conexão</button><button class="btn pq" id="btnLimpar" data-acao="limpar-local">Apagar cópia local</button></div>
+</header>
+<div class="layout">
+  <nav class="menu" id="menu"></nav>
+  <main id="app"></main>
+</div>
+<div id="modal"><div class="caixa" id="caixa"></div></div>
+<div id="lateral"></div>
+<div id="aviso" role="status"></div>
+<input type="file" id="arqOC" accept="application/pdf" hidden>
+<input type="file" id="arqCot" accept="application/pdf,.pdf,.xlsx,.xls,.csv" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="banco.js"></script>
+<script src="leitor-pdf.js"></script>
+<script src="leitor-planilha.js"></script>
+<script src="oc-padrao.js"></script>
+<script src="calculo.js"></script>
+<script src="exportar-mapa.js"></script>
+<script src="casamento.js"></script>
+<script>
+'use strict';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const Leitor = window.LeitorPDF, Casa = window.Casamento;
+
+/* ============================== utilitários ============================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const r2 = v => Math.round((v + Number.EPSILON) * 100) / 100;
+const brl = v => (v === null || v === undefined || v === '' || isNaN(v)) ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dec = v => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const dataBR = iso => /^\d{4}-\d{2}-\d{2}/.test(iso || '') ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : (iso || '—');
+const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const lerNum = v => { const t = String(v == null ? '' : v).trim().replace('%', ''); if (t === '') return ''; const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); return isNaN(n) ? '' : n; };
+const rid = p => p + '_' + Math.random().toString(36).slice(2, 10);
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+let avisoT;
+function aviso(msg) { const a = $('aviso'); a.textContent = msg; a.style.display = 'block'; clearTimeout(avisoT); avisoT = setTimeout(() => { a.style.display = 'none'; }, 5200); }
+
+/* ============================== conexão com os dados ============================== */
+/* Dois modos com o mesmo contrato (banco.js): cópia local no navegador ou planilha do Google. */
+const CFG = 'tmx_conexao_v1';
+const lerCfg = () => { try { return JSON.parse(localStorage.getItem(CFG)) || {}; } catch (e) { return {}; } };
+const lerToken = () => { try { return sessionStorage.getItem('tmx_token') || localStorage.getItem('tmx_token') || ''; } catch (e) { return ''; } };
+let ocupado = 0;
+function marcarOcupado(d) { ocupado += d; const el = $('ocupado'); if (el) el.style.display = ocupado > 0 ? 'inline-block' : 'none'; }
+function abrirBanco() {
+  const c = lerCfg();
+  if (c.modo === 'planilha' && c.url && lerToken()) return TMXBanco.criarRemoto({ url: c.url, token: lerToken(), aoOcupar: marcarOcupado });
+  return TMXBanco.criarLocal(localStorage);
+}
+let Banco = abrirBanco();
+
+/* ============================== estado ============================== */
+const S = { ocs: [], fornecedores: [], dic: [], cotacoes: [] };
+const ui = { tela: 'ocs', ocId: null, aba: 'mapa', pdfAberto: null, rascunho: null };
+const pdfs = new Map(); // id da cotação → { url, nome } (só nesta sessão)
+
+async function recarregar() {
+  const d = await Banco.carregar(ui.ocId);
+  S.ocs = d.ocs; S.fornecedores = d.fornecedores; S.dic = d.dicionario; S.cotacoes = d.cotacoes || [];
+  if (ui.ocId && !S.ocs.some(o => o.id === ui.ocId)) { ui.ocId = null; ui.tela = 'ocs'; S.cotacoes = []; }
+}
+const ocAtual = () => S.ocs.find(o => o.id === ui.ocId);
+const nomeForn = id => (S.fornecedores.find(f => f.id === id) || { nome: '(fornecedor removido)' }).nome;
+
+/* ============================== cálculo ============================== */
+const { linhaDe, custo, totalCot } = window.Calculo;
+const mencionaICMS = cot => (cot.observacoes || []).some(o => /ICMS/i.test(o));
+const ICMS_OPCOES = [['', 'Escolher cenário…'], ['0', 'Contribuinte do ICMS (sem acréscimo)'], ['10', 'Não contribuinte · GO (+10%)'], ['11', 'Não contribuinte · Sul/Sudeste (+11%)'], ['16.5', 'Não contribuinte · BA (+16,5%)'], ['20', 'Não contribuinte · ES, MS, PB, MA, GO e demais (+20%)'], ['22', 'Não contribuinte · SE e PI (+22%)']];
+function descontoSugeridoOC(cot, oc) {
+  if (!oc.desconto_total || !oc.subtotal || (Number(cot.desconto_pct) || 0) > 0) return null;
+  const a = norm(oc.fornecedor), b = norm(nomeForn(cot.fornecedor_id));
+  if (!a || !b) return null;
+  const ta = new Set(a.split(' ')), tb = b.split(' ').filter(t => t.length > 1);
+  if (!tb.length || tb.filter(t => ta.has(t)).length / tb.length < 0.6) return null;
+  return Math.round(oc.desconto_total / oc.subtotal * 100000) / 1000;
+}
+
+/* ============================== visão geral / menu ============================== */
+function renderMenu() {
+  const it = [['ocs', 'Ordens de compra'], ['fornecedores', 'Fornecedores'], ['dicionario', 'Dicionário']];
+  $('menu').innerHTML = it.map(([k, t]) => '<button class="' + ((ui.tela === k || (k === 'ocs' && ui.tela === 'oc')) ? 'ativo' : '') + '" data-acao="tela" data-v="' + k + '">' + t + '</button>').join('');
+}
+function render() {
+  renderMenu();
+  const a = $('app');
+  if (ui.tela === 'ocs') a.innerHTML = htmlOCs();
+  else if (ui.tela === 'oc') a.innerHTML = htmlOC();
+  else if (ui.tela === 'fornecedores') a.innerHTML = htmlFornecedores();
+  else a.innerHTML = htmlDicionario();
+  renderLateral();
+}
+
+/* ---------- lista de OCs ---------- */
+function htmlOCs() {
+  const linhas = S.ocs.map(o => {
+    const nc = o.n_cotacoes || 0;
+    return '<tr class="clicavel" data-acao="abrir-oc" data-v="' + esc(o.id) + '"><td class="mono">' + esc(o.numero) + '</td><td>' + esc(o.obra) + '</td><td>' + dataBR(o.data) + '</td><td>' + o.itens.length + '</td><td>' + nc + '</td><td>' + esc(o.status) + '</td></tr>';
+  }).join('');
+  return '<div class="linha"><div><h2>Ordens de compra</h2><div class="sub">Importe o PDF da OC do Obra Prima ou cole os itens. Depois adicione as cotações dos fornecedores.</div></div>'
+    + '<div class="espaco linha"><button class="btn" data-acao="oc-manual">Nova OC (colar itens)</button><button class="btn prim" data-acao="oc-importar">Importar PDF da OC</button></div></div>'
+    + (S.ocs.length ? '<div class="rolagem"><table><thead><tr><th>Nº</th><th>Obra</th><th>Data</th><th>Itens</th><th>Cotações</th><th>Status</th></tr></thead><tbody>' + linhas + '</tbody></table></div>'
+      : '<div class="vazio">Nenhuma OC ainda. Comece importando o PDF da OC.</div>');
+}
+
+/* ---------- OC aberta ---------- */
+function htmlOC() {
+  const oc = ocAtual(); if (!oc) return '';
+  const cab = '<div class="linha"><div><div class="sub"><a href="#" data-acao="tela" data-v="ocs">Ordens de compra</a> › OC ' + esc(oc.numero) + '</div><h2>OC ' + esc(oc.numero) + ' · ' + esc(oc.obra) + '</h2>'
+    + '<div class="sub">' + dataBR(oc.data) + (oc.fornecedor ? ' · fornecedor na OC: ' + esc(oc.fornecedor) : '') + ' · ' + oc.itens.length + ' itens</div></div>'
+    + '<div class="espaco linha"><button class="btn" data-acao="oc-padrao" title="Planilha com os itens e as quantidades desta OC, para o fornecedor preencher e devolver">Gerar OC padrão (Excel)</button><button class="btn lar" data-acao="cot-adicionar">Adicionar cotação (PDF, Excel ou CSV)</button></div></div>'
+    + '<div class="abas"><button class="' + (ui.aba === 'mapa' ? 'ativo' : '') + '" data-acao="aba" data-v="mapa">Mapa</button><button class="' + (ui.aba === 'itens' ? 'ativo' : '') + '" data-acao="aba" data-v="itens">Itens da OC</button></div>';
+  return cab + (ui.aba === 'mapa' ? htmlMapa(oc) : htmlItensOC(oc));
+}
+
+function htmlItensOC(oc) {
+  const temCot = S.cotacoes.length > 0;
+  const linhas = oc.itens.map(i => '<tr><td class="mono">' + String(i.n).padStart(2, '0') + '</td>'
+    + '<td><input data-campo="oc-item" data-n="' + i.n + '" data-f="material_id" value="' + esc(i.material_id) + '" placeholder="código no Obra Prima"></td>'
+    + '<td><input data-campo="oc-item" data-n="' + i.n + '" data-f="descricao" value="' + esc(i.descricao) + '"></td>'
+    + '<td><input class="n" data-campo="oc-item" data-n="' + i.n + '" data-f="qtd" value="' + esc(String(i.qtd).replace('.', ',')) + '"></td>'
+    + '<td><input class="n" data-campo="oc-item" data-n="' + i.n + '" data-f="unidade" value="' + esc(i.unidade) + '"></td>'
+    + '<td class="mono">' + (i.preco_unit === '' || i.preco_unit == null ? '—' : brl(i.preco_unit)) + '</td><td class="mono">' + (i.desconto_valor === '' || i.desconto_valor == null ? '—' : brl(i.desconto_valor)) + '</td>'
+    + '<td>' + (temCot ? '' : '<button class="btn pq perigo" data-acao="oc-item-del" data-n="' + i.n + '">remover</button>') + '</td></tr>').join('');
+  return '<div class="sub">O código do insumo no Obra Prima é o que permite ao sistema aprender os vínculos (dicionário). Sem ele, o vínculo vale só para esta cotação.</div>'
+    + '<div class="rolagem"><table><thead><tr><th>#</th><th>Código Obra Prima</th><th>Descrição na OC</th><th>Qtd.</th><th>Un.</th><th>Unit. na OC</th><th>Desc. na OC</th><th></th></tr></thead><tbody>' + linhas + '</tbody></table></div>'
+    + '<div class="linha"><button class="btn" data-acao="oc-item-add">Adicionar item</button><span class="sub">As alterações são salvas ao sair de cada campo.</span>'
+    + '<div class="espaco linha"><button class="btn perigo" data-acao="oc-excluir">Excluir esta OC e suas cotações</button></div></div>';
+}
+
+/* ---------- mapa ---------- */
+function statusRotulo(s) { return { confere: 'Confere', confirmar: 'Confirmar produto', manual: 'Vínculo manual', sem_cotacao: 'Fora da OC' }[s] || s; }
+
+function htmlMapa(oc) {
+  if (!S.cotacoes.length) return '<div class="vazio">Nenhuma cotação nesta OC. Use "Adicionar cotação" para ler o PDF, o Excel ou o CSV que o fornecedor devolveu.</div>';
+  const cots = S.cotacoes, N = cots.length;
+  const tot = cots.map(c => totalCot(c, oc));
+  return htmlCards(oc, cots, tot) + htmlGrade(oc, cots, tot) + htmlAlertas(oc, cots) + htmlExtras(oc, cots);
+}
+
+function htmlCards(oc, cots, tot) {
+  const cards = cots.map((c, k) => {
+    const t = tot[k], hoje_ = hoje();
+    const vencida = c.validade_ate && c.validade_ate < hoje_;
+    const val = c.validade ? '<span class="chip ' + (vencida ? 'erro' : 'confere') + '">' + (vencida ? 'Vencida em ' + dataBR(c.validade_ate) : 'Válida até ' + dataBR(c.validade_ate || '') ) + '</span>' : '<span class="chip confirmar">Sem validade</span>';
+    const sug = descontoSugeridoOC(c, oc);
+    const icms = mencionaICMS(c);
+    return '<div class="card"><div class="k">' + esc(nomeForn(c.fornecedor_id)) + '</div>'
+      + '<div class="grande">' + brl(t.total) + '</div>'
+      + '<div class="sub"><b>' + t.n + ' de ' + oc.itens.length + '</b> itens · frete ' + brl(t.frete) + (Number(c.despesas) ? ' · despesas ' + (c.incluir_despesas !== false ? brl(t.desp) : 'não incluídas') : '') + '</div>'
+      + '<div class="sub">Emitida em ' + dataBR(c.data_emissao) + ' · ' + (c.pagamento ? esc(c.pagamento) : 'pagamento não informado') + '</div>'
+      + ((c.observacoes || []).filter(o => /^Prazo de entrega:/.test(o)).map(o => '<div class="sub">' + esc(o) + '</div>').join('')) + '<div>' + val + '</div>'
+      + '<div class="ctl">'
+      + '<label>Desconto % <input type="number" step="0.001" min="0" data-campo="cot-desc" data-id="' + esc(c.id) + '" value="' + esc(c.desconto_pct === '' || c.desconto_pct == null ? '' : c.desconto_pct) + '"></label>'
+      + (sug ? '<button class="btn pq" data-acao="aplicar-desc-oc" data-id="' + esc(c.id) + '" data-v="' + sug + '">Aplicar desconto da OC (' + String(sug).replace('.', ',') + '%)</button>' : '')
+      + (icms ? '<label>ICMS <select data-campo="cot-icms" data-id="' + esc(c.id) + '">' + ICMS_OPCOES.map(([v, t_]) => '<option value="' + v + '"' + (String(c.acrescimo_pct) === v || (c.acrescimo_pct === '' && v === '') ? ' selected' : '') + '>' + t_ + '</option>').join('') + '</select></label>'
+        : '<label>Acréscimo % <input type="number" step="0.1" min="0" data-campo="cot-acr" data-id="' + esc(c.id) + '" value="' + esc(c.acrescimo_pct === '' || c.acrescimo_pct == null ? '' : c.acrescimo_pct) + '"></label>')
+      + (Number(c.despesas) ? '<label><input type="checkbox" data-campo="cot-desp" data-id="' + esc(c.id) + '"' + (c.incluir_despesas !== false ? ' checked' : '') + '> incluir despesas</label>' : '')
+      + '</div>'
+      + '<div class="linha"><button class="btn pq" data-acao="ver-pdf" data-id="' + esc(c.id) + '">Ver PDF original</button><button class="btn pq" data-acao="recasar" data-id="' + esc(c.id) + '">Refazer casamento</button><button class="btn pq perigo" data-acao="cot-excluir" data-id="' + esc(c.id) + '">Excluir</button></div></div>';
+  }).join('');
+  // comparação direta: itens cotados por todos
+  let cmp = '';
+  if (cots.length > 1) {
+    const comuns = oc.itens.filter(it => cots.every(c => linhaDe(c, it.n)));
+    if (!comuns.length) cmp = '<div class="card dest"><div class="k">Comparação direta</div><div class="grande">—</div><div class="sub">Nenhum item foi cotado por todos os fornecedores.</div></div>';
+    else {
+      const somas = cots.map(c => r2(comuns.reduce((s, it) => s + custo(c, linhaDe(c, it.n), it.qtd), 0)));
+      const min = Math.min(...somas), k = somas.indexOf(min), seg = Math.min(...somas.filter((_, j) => j !== k));
+      const empate = somas.filter(v => v === min).length > 1;
+      cmp = '<div class="card dest"><div class="k">Nos ' + comuns.length + ' itens cotados por todos</div><div class="grande">' + (empate ? 'Empate' : esc(nomeForn(cots[k].fornecedor_id))) + '</div>'
+        + '<div class="sub">' + (empate ? '' : 'Menor por ' + brl(r2(seg - min)) + ' (' + (seg ? String(r2((seg - min) / seg * 100)).replace('.', ',') : '0') + '%). ') + cots.map((c, j) => esc(nomeForn(c.fornecedor_id)) + ' ' + brl(somas[j])).join(' · ') + '</div>'
+        + cots.map(c => {
+          const st = comuns.map(it => linhaDe(c, it.n).status), ok_ = st.filter(x => x === 'confere').length, cf = st.filter(x => x === 'confirmar').length, mn = st.filter(x => x === 'manual').length;
+          const p = []; if (ok_) p.push('<b>' + ok_ + '</b> conferem com a OC'); if (cf) p.push('<b>' + cf + '</b> a confirmar'); if (mn) p.push('<b>' + mn + '</b> vinculados por você');
+          return '<div class="sub">' + esc(nomeForn(c.fornecedor_id)) + ': ' + p.join(' · ') + '.</div>';
+        }).join('')
+        + (cots.some(c => comuns.some(it => linhaDe(c, it.n).status === 'confirmar')) ? '<div class="sub"><b>Atenção:</b> parte dos itens a confirmar é de outra marca ou material; o menor preço pode não ser do produto pedido.</div>' : '') + '</div>';
+    }
+  }
+  return '<div class="cards">' + cards + cmp + '</div>';
+}
+
+function celula(oc, it, cot, melhor, difTxt) {
+  const lk = linhaDe(cot, it.n);
+  const usados = new Set(cot.itens.filter(i => i.item_oc_n !== '' && Number(i.item_oc_n) !== it.n).map(i => i.linha));
+  const sel = '<select data-campo="relink" data-id="' + esc(cot.id) + '" data-n="' + it.n + '" aria-label="Alterar vínculo do item ' + it.n + '"><option value="">Alterar vínculo…</option><option value="none">Sem vínculo</option>'
+    + cot.itens.map(i => '<option value="' + i.linha + '"' + (usados.has(i.linha) ? ' disabled' : '') + '>' + esc(i.codigo) + ' · ' + esc(i.descricao_curta) + (usados.has(i.linha) ? ' (em uso)' : '') + '</option>').join('') + '</select>';
+  if (!lk) return '<div class="c"><div class="topo-cel"><span class="chip none">Não cotado</span></div><div class="sub">Este fornecedor não enviou preço para o item.</div><div class="acoes-cel">' + sel + '</div></div>';
+  const fator = Number(lk.fator_unidade) || 1, base = Number(lk.preco_unit) / fator, c_ = custo(cot, lk, it.qtd);
+  const aj = [];
+  if (Number(cot.desconto_pct)) aj.push('−' + String(cot.desconto_pct).replace('.', ',') + '%');
+  if (Number(cot.acrescimo_pct)) aj.push('+' + String(cot.acrescimo_pct).replace('.', ',') + '%');
+  const calc = fator > 1 ? it.qtd + ' × ' + brl(lk.preco_unit) + ' ÷ ' + fator + ' = ' + it.qtd + ' × R$ ' + dec(base) + ' (' + esc(lk.un) + ')' : it.qtd + ' × ' + brl(lk.preco_unit) + ' (' + esc(lk.un) + ')';
+  const notas = String(lk.nota || '').split(' | ').filter(Boolean).map(n => '<div class="nota">' + esc(n) + '</div>').join('');
+  const emb = lk.embalagem ? '<div class="nota">Embalagem: ' + esc(lk.embalagem) + '</div>' : '';
+  const aceitar = lk.status === 'confirmar' ? '<button class="btn pq" data-acao="aceitar" data-id="' + esc(cot.id) + '" data-n="' + it.n + '">Aceitar vínculo</button>' : '';
+  return '<div class="c' + (melhor ? ' melhor' : '') + '"><div class="topo-cel"><span class="chip ' + lk.status + '">' + statusRotulo(lk.status) + '</span>'
+    + (melhor ? '<span class="menor' + (lk.status === 'confirmar' ? ' alerta' : '') + '">Menor preço' + difTxt + (lk.status === 'confirmar' ? ' · confirmar produto' : '') + '</span>' : '') + '</div>'
+    + '<div class="desc"><span class="cod">' + esc(lk.codigo) + '</span> · ' + esc(lk.descricao_curta) + '</div>'
+    + '<div class="din"><strong>' + brl(c_) + '</strong><span class="calc">' + calc + (aj.length ? ' · ' + aj.join(' ') : '') + '</span></div>'
+    + emb + notas
+    + '<div class="acoes-cel">' + aceitar + sel + '<label class="calc" title="Peças por unidade cotada (kit, par, saco)">fator <input data-campo="fator" data-id="' + esc(cot.id) + '" data-linha="' + lk.linha + '" value="' + fator + '"></label></div></div>';
+}
+
+function htmlGrade(oc, cots, tot) {
+  const cols = '3rem minmax(190px,1fr) ' + cots.map(() => 'minmax(260px,1.2fr)').join(' ');
+  let h = '<div class="mapa"><div class="grade" style="grid-template-columns:' + cols + '">'
+    + '<div class="c cab">#</div><div class="c cab">Item da OC</div>' + cots.map(c => '<div class="c cab">' + esc(nomeForn(c.fornecedor_id)) + '</div>').join('');
+  oc.itens.forEach(it => {
+    const custos = cots.map(c => { const lk = linhaDe(c, it.n); return lk ? custo(c, lk, it.qtd) : null; });
+    const validos = custos.filter(v => v !== null);
+    const min = validos.length > 1 ? Math.min(...validos) : null;
+    const empate = min !== null && validos.filter(v => v === min).length > 1;
+    const seg = min !== null ? Math.min(...validos.filter(v => v !== min), Infinity) : null;
+    h += '<div class="c n">' + String(it.n).padStart(2, '0') + '</div><div class="c"><div class="oc-desc">' + esc(it.descricao) + '</div><div class="qtd">Qtd. na OC: ' + String(it.qtd).replace('.', ',') + ' ' + esc(it.unidade) + (it.material_id ? ' · cód. ' + esc(it.material_id) : '') + '</div></div>';
+    cots.forEach((c, k) => {
+      const melhor = min !== null && !empate && custos[k] === min;
+      h += celula(oc, it, c, melhor, melhor && isFinite(seg) ? ' · −' + brl(r2(seg - min)) : '');
+    });
+  });
+  h += '<div class="c rod"></div><div class="c rod">Total do mapa</div>' + tot.map((t, k) => '<div class="c rod"><div class="calc">' + t.n + ' de ' + oc.itens.length + ' itens</div><div class="mono">' + brl(t.total) + '</div></div>').join('');
+  h += '</div></div><div class="linha"><button class="btn prim" data-acao="baixar-mapa">Baixar mapa em Excel (.xlsx)</button><button class="btn" data-acao="copiar-mapa">Copiar mapa para colar</button><span class="sub">Totais calculados sobre as quantidades da OC, não sobre o que cada fornecedor cotou.</span></div>';
+  return h;
+}
+
+function coletarAlertas(oc, cots) {
+  const L = [];
+  const add = (t, x, n) => L.push({ n: n || 'aviso', t, x });
+  if (!oc.cond_pgto) add('OC sem condição de pagamento', 'Preencher a condição de pagamento antes de fechar a compra.');
+  if (!oc.previsao_entrega) add('OC sem previsão de entrega', 'Combinar o prazo de entrega com o fornecedor vencedor.');
+  cots.forEach(c => {
+    const nome = esc(nomeForn(c.fornecedor_id));
+    if (c.validade_ate && c.validade_ate < hoje()) add('Cotação vencida · ' + nome, 'A validade acabou em ' + dataBR(c.validade_ate) + ' (' + esc(c.validade) + '). Peça uma cotação nova antes de comprar.', 'erro');
+    else if (!c.validade) add('Cotação sem validade · ' + nome, 'O documento não informa validade; confirme preço, prazo e estoque com o fornecedor.');
+    if (/Pz:|^\d+P\b/.test(c.pagamento || '')) add('Condição de pagamento em código · ' + nome, 'Está como "' + esc(c.pagamento) + '". Esclareça com o representante.');
+    if (mencionaICMS(c) && c.acrescimo_pct === '') add('ICMS não escolhido · ' + nome, 'O preço vale para contribuinte do ICMS; para os demais soma-se um percentual por região. Escolha o cenário no cartão do fornecedor.');
+    const conf = c.itens.filter(i => i.item_oc_n !== '' && i.status === 'confirmar');
+    if (conf.length) add('Produto a confirmar · ' + nome, conf.map(i => 'Item ' + i.item_oc_n + ': ' + esc(i.nota || 'conferir se o produto atende')).join('<br>'));
+    const dq = c.itens.filter(i => i.item_oc_n !== '').map(i => ({ i, it: oc.itens.find(x => x.n === Number(i.item_oc_n)) })).filter(({ i, it }) => it && Number(i.qtd_cotada) !== Number(it.qtd));
+    if (dq.length) add('Quantidade cotada diferente da OC · ' + nome, dq.map(({ i, it }) => 'Item ' + it.n + ': OC pede ' + it.qtd + ', cotou ' + i.qtd_cotada).join('; ') + '. O preço pode mudar com o volume.');
+    const kits = c.itens.filter(i => i.item_oc_n !== '' && Number(i.fator_unidade) > 1);
+    if (kits.length) add('Embalagem com várias peças · ' + nome, kits.map(i => 'Item ' + i.item_oc_n + ': ' + esc(i.codigo) + ' vem em unidade com ' + i.fator_unidade + ' peças (preço dividido por ' + i.fator_unidade + ' no mapa)').join('; ') + '. Se a OC conta em unidades da embalagem, ajuste o fator na célula.');
+    const sug = descontoSugeridoOC(c, oc);
+    if (sug) add('Desconto da OC não aparece na cotação · ' + nome, 'A OC traz ' + brl(oc.desconto_total) + ' de desconto (cerca de ' + String(sug).replace('.', ',') + '%) e a cotação não. Confirme que o fornecedor o aceitou e aplique no cartão.');
+  });
+  return L;
+}
+function htmlAlertas(oc, cots) {
+  const L = coletarAlertas(oc, cots).map(a => '<li class="' + a.n + '"><b>' + a.t + '</b><span>' + a.x + '</span></li>');
+  return '<section><h3>Pontos para confirmar antes de fechar</h3>' + (L.length ? '<ul class="alertas">' + L.join('') + '</ul>' : '<div class="vazio">Nenhum ponto pendente.</div>') + '</section>';
+}
+// texto puro dos alertas (sem HTML) para a exportação
+function alertasEmTexto(oc, cots) {
+  const txt = h => new DOMParser().parseFromString('<body>' + String(h).replace(/<br>/g, ' ; ') + '</body>', 'text/html').body.textContent;
+  return coletarAlertas(oc, cots).map(a => ({ nivel: a.n, titulo: txt(a.t), texto: txt(a.x) }));
+}
+
+function htmlExtras(oc, cots) {
+  const linhas = [];
+  cots.forEach(c => c.itens.filter(i => i.item_oc_n === '').forEach(i => linhas.push('<tr><td>' + esc(nomeForn(c.fornecedor_id)) + '</td><td class="mono">' + esc(i.codigo) + '</td><td>' + esc(i.descricao_curta) + '</td><td class="mono">' + esc(i.qtd_cotada) + ' ' + esc(i.un) + ' · ' + brl(i.preco_unit) + (Number(i.fator_unidade) > 1 ? ' (' + brl(Number(i.preco_unit) / Number(i.fator_unidade)) + ' a peça)' : '') + '</td></tr>')));
+  return '<section><h3>Itens cotados fora da OC</h3>' + (linhas.length ? '<div class="rolagem"><table><thead><tr><th>Fornecedor</th><th>Código</th><th>Descrição cotada</th><th>Cotação</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table></div>' : '<div class="vazio">Todas as linhas cotadas estão vinculadas a um item da OC.</div>') + '</section>';
+}
+
+/* ---------- fornecedores e dicionário ---------- */
+function htmlFornecedores() {
+  const l = S.fornecedores.map(f => '<tr><td><input data-campo="forn" data-id="' + esc(f.id) + '" data-f="nome" value="' + esc(f.nome) + '"></td><td><input data-campo="forn" data-id="' + esc(f.id) + '" data-f="regra_icms" value="' + esc(f.regra_icms) + '"></td><td><input data-campo="forn" data-id="' + esc(f.id) + '" data-f="contato" value="' + esc(f.contato) + '"></td></tr>').join('');
+  return '<div class="linha"><div><h2>Fornecedores</h2><div class="sub">Criados automaticamente ao ler a primeira cotação de cada um.</div></div><div class="espaco"><button class="btn" data-acao="forn-novo">Novo fornecedor</button></div></div>'
+    + (S.fornecedores.length ? '<div class="rolagem"><table><thead><tr><th>Nome</th><th>Regra de ICMS</th><th>Contato</th></tr></thead><tbody>' + l + '</tbody></table></div>' : '<div class="vazio">Nenhum fornecedor ainda.</div>');
+}
+function htmlDicionario() {
+  const l = S.dic.map((d, i) => '<tr><td>' + esc(nomeForn(d.fornecedor_id)) + '</td><td class="mono">' + esc(d.codigo_fornecedor) + '</td><td>' + esc(d.descricao_normalizada) + '</td><td class="mono">' + esc(d.material_id) + '</td><td class="mono">' + esc(d.fator_unidade) + '</td><td>' + dataBR(d.data) + '</td><td><button class="btn pq perigo" data-acao="dic-del" data-v="' + i + '">remover</button></td></tr>').join('');
+  return '<div><h2>Dicionário</h2><div class="sub">O que o sistema aprendeu: como cada fornecedor chama cada insumo. Cada vínculo que você aceita ou corrige entra aqui, e a próxima cotação do mesmo fornecedor resolve sozinha.</div></div>'
+    + (S.dic.length ? '<div class="rolagem"><table><thead><tr><th>Fornecedor</th><th>Código dele</th><th>Descrição normalizada</th><th>Insumo (Obra Prima)</th><th>Fator</th><th>Data</th><th></th></tr></thead><tbody>' + l + '</tbody></table></div>' : '<div class="vazio">O dicionário está vazio.</div>');
+}
+
+/* ---------- PDF ao lado ---------- */
+function renderLateral() {
+  const p = ui.pdfAberto && pdfs.get(ui.pdfAberto);
+  $('lateral').innerHTML = ui.pdfAberto ? '<aside class="pdf-lateral"><header><span>PDF original' + (p ? ' · ' + esc(p.nome) : '') + '</span><button class="btn pq espaco" data-acao="fechar-pdf">Fechar</button></header>'
+    + (p && p.url ? '<iframe src="' + esc(p.url) + '" title="PDF original"></iframe>' : p ? '<div class="vazio" style="margin:16px">O arquivo desta cotação é uma planilha (' + esc(p.nome) + '). Abra-o no Excel para conferir os valores.</div>' : '<div class="vazio" style="margin:16px">O PDF desta cotação só fica disponível na sessão em que foi enviado. Reenvie o arquivo para vê-lo de novo.</div>') + '</aside>' : '';
+}
+
+/* ============================== modais ============================== */
+const abrirModal = h => { $('caixa').innerHTML = h; $('modal').classList.add('aberto'); };
+const fecharModal = () => { $('modal').classList.remove('aberto'); $('caixa').innerHTML = ''; ui.rascunho = null; };
+
+function tabelaPrevia(itens, tipo) {
+  const oc = tipo === 'oc';
+  return '<div class="rolagem" style="max-height:38vh"><table><thead><tr>' + (oc ? '<th>#</th>' : '<th>Código</th>') + '<th>Descrição</th><th>Un.</th><th>Qtd.</th><th>' + (oc ? 'Unit.' : 'Preço') + '</th>' + (oc ? '<th>Desc.</th>' : '<th>Fator</th>') + '<th>Total</th></tr></thead><tbody>'
+    + itens.map(i => '<tr><td class="mono">' + esc(oc ? i.n : i.codigo) + '</td><td>' + esc(i.descricao_curta || i.descricao) + '</td><td>' + esc(i.un) + '</td><td class="mono">' + esc(i.qtd) + '</td><td class="mono">' + brl(i.preco_unit) + '</td><td class="mono">' + (oc ? brl(i.desconto_valor) : esc(i.fator_unidade || 1)) + '</td><td class="mono">' + brl(i.total) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+function listaAvisos(v) {
+  return v.avisos.length ? '<ul class="alertas">' + v.avisos.map(a => '<li class="' + a.nivel + '"><b>' + (a.nivel === 'erro' ? 'Conta não fecha' : 'Atenção') + '</b><span>' + esc(a.msg) + '</span></li>').join('') + '</ul>' : '';
+}
+
+/* ---------- importar OC ---------- */
+async function lerPdf(file) {
+  const buf = await file.arrayBuffer();
+  return Leitor.lerArquivo(buf);
+}
+async function importarOC(file) {
+  try {
+    aviso('Lendo o PDF…');
+    const d = Leitor.ler(await lerPdf(file));
+    if (!d) return abrirModal('<h2>Formato não reconhecido</h2><p>Este PDF não parece ser a ordem de compra do Obra Prima. Use "Nova OC (colar itens)" para digitar ou colar os itens.</p><div class="linha"><button class="btn" data-acao="fechar-modal">Fechar</button></div>');
+    if (d.tipo !== 'oc') return abrirModal('<h2>Este PDF é uma cotação</h2><p>Para ler cotações, abra a OC e use "Adicionar cotação (PDF)".</p><div class="linha"><button class="btn" data-acao="fechar-modal">Fechar</button></div>');
+    const v = Leitor.validar(d), existe = S.ocs.find(o => o.numero === d.numero);
+    ui.rascunho = { tipo: 'oc', d };
+    abrirModal('<h2>OC ' + esc(d.numero) + ' lida</h2><div class="sub">' + esc(d.obra) + ' · ' + dataBR(d.data_emissao) + ' · fornecedor: ' + esc(d.fornecedor) + '</div>'
+      + tabelaPrevia(d.itens, 'oc')
+      + '<div class="sub">Subtotal ' + brl(d.subtotal) + ' · desconto ' + brl(d.desconto_total) + ' · frete ' + brl(d.frete) + ' · <b>total ' + brl(d.total_documento) + '</b></div>' + listaAvisos(v)
+      + (existe ? '<div class="sub"><b>A OC ' + esc(d.numero) + ' já existe.</b> Salvar vai substituir os itens (as cotações ficam, mas os vínculos podem perder o sentido).</div>' : '')
+      + '<div class="linha"><button class="btn prim" data-acao="oc-salvar-importada">' + (existe ? 'Substituir OC' : 'Salvar OC') + '</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+  } catch (e) { aviso('Erro ao ler o PDF: ' + e.message); }
+}
+async function salvarOCImportada() {
+  const d = ui.rascunho.d, existe = S.ocs.find(o => o.numero === d.numero);
+  const { id } = await Banco.salvarOC({
+    oc: { id: existe && existe.id, numero: d.numero, obra: d.obra, data: d.data_emissao, status: 'aberta', cond_pgto: d.cond_pgto || '', previsao_entrega: d.previsao_entrega || '', fornecedor: d.fornecedor, subtotal: d.subtotal, desconto_total: d.desconto_total, total_documento: d.total_documento },
+    itens: d.itens.map(i => ({ n: i.n, preco_unit: i.preco_unit, desconto_valor: i.desconto_valor, material_id: (existe && (existe.itens.find(x => x.n === i.n) || {}).material_id) || '', descricao: i.descricao, qtd: i.qtd, unidade: i.un }))
+  });
+  fecharModal(); ui.ocId = id; ui.tela = 'oc'; ui.aba = 'itens'; await recarregar(); render();
+  aviso('OC salva. Preencha o código do insumo no Obra Prima para o dicionário aprender.');
+}
+function ocManual() {
+  abrirModal('<h2>Nova OC</h2><div class="campos"><label>Número<input type="text" id="mNum"></label><label>Obra<input type="text" id="mObra"></label><label>Data<input type="text" id="mData" placeholder="dd/mm/aaaa"></label></div>'
+    + '<label class="sub">Cole os itens, um por linha: <b>descrição ; quantidade ; unidade ; código no Obra Prima (opcional)</b>. Colar de uma planilha também funciona (colunas separadas por tabulação).</label><textarea id="mItens" placeholder="Engate de PVC 50cm ; 30 ; UN ; 1234"></textarea>'
+    + '<div class="linha"><button class="btn prim" data-acao="oc-manual-salvar">Salvar OC</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+async function salvarOCManual() {
+  try {
+    const itens = $('mItens').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map((l, k) => {
+      const p = l.split(/\t|;/).map(x => x.trim());
+      return { n: k + 1, descricao: p[0], qtd: lerNum(p[1]), unidade: p[2] || 'UN', material_id: p[3] || '' };
+    });
+    const { id } = await Banco.salvarOC({ oc: { numero: $('mNum').value, obra: $('mObra').value, data: Leitor.dataISO($('mData').value) || hoje(), status: 'aberta', cond_pgto: '', previsao_entrega: '' }, itens });
+    fecharModal(); ui.ocId = id; ui.tela = 'oc'; ui.aba = 'mapa'; await recarregar(); render();
+  } catch (e) { aviso(e.message); }
+}
+
+/* ---------- adicionar cotação ---------- */
+async function lerCotacao(file) {
+  try {
+    aviso('Lendo o arquivo…');
+    if (/\.(xlsx|xls|csv)$/i.test(file.name)) return await lerCotacaoPlanilha(file);
+    const d = Leitor.ler(await lerPdf(file));
+    const url = URL.createObjectURL(file);
+    if (d && d.tipo === 'oc') return abrirModal('<h2>Este PDF é uma OC</h2><p>Para cotações, envie o PDF que o fornecedor devolveu.</p><div class="linha"><button class="btn" data-acao="fechar-modal">Fechar</button></div>');
+    ui.rascunho = { tipo: 'cot', d, url, nome: file.name };
+    if (!d) return modalIA();
+    modalPreviaCotacao();
+  } catch (e) { aviso('Erro ao ler o arquivo: ' + e.message); }
+}
+
+/* ---------- cotação em Excel ou CSV ---------- */
+async function lerCotacaoPlanilha(file) {
+  const rows = await LeitorPlanilha.lerArquivo(file);
+  if (!rows.length) throw new Error('O arquivo está vazio.');
+  ui.rascunho = { tipo: 'cot', d: null, url: null, nome: file.name, rows };
+  try { ui.rascunho.d = LeitorPlanilha.extrair(rows); }
+  catch (e) { if (e.codigo === 'sem_cabecalho') return modalMapeamento(rows); throw e; }
+  modalPreviaCotacao();
+}
+const letraCol = i => (i >= 26 ? String.fromCharCode(64 + Math.floor(i / 26)) : '') + String.fromCharCode(65 + (i % 26));
+function modalMapeamento(rows) {
+  const amostra = rows.slice(0, 12), n = Math.max(1, ...amostra.map(l => l.length));
+  const opcoes = '<option value="">— não tem —</option>' + Array.from({ length: n }, (_, i) => '<option value="' + i + '">Coluna ' + letraCol(i) + '</option>').join('');
+  const papeis = [['descricao', 'Descrição do produto *'], ['qtd', 'Quantidade *'], ['preco_unit', 'Preço unitário *'], ['codigo', 'Código do fornecedor'], ['un', 'Unidade'], ['desconto_pct', 'Desconto %'], ['total', 'Total da linha']];
+  abrirModal('<h2>Não reconheci as colunas desta planilha</h2><div class="sub">Diga em qual coluna está cada informação. Os campos com * são obrigatórios.</div>'
+    + '<div class="rolagem" style="max-height:34vh"><table><thead><tr><th>Linha</th>' + Array.from({ length: n }, (_, i) => '<th>' + letraCol(i) + '</th>').join('') + '</tr></thead><tbody>'
+    + amostra.map((l, k) => '<tr><td class="mono">' + (k + 1) + '</td>' + Array.from({ length: n }, (_, i) => '<td>' + esc(l[i] instanceof Date ? dataBR(LeitorPlanilha.dataISO(l[i])) : l[i]) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>'
+    + '<div class="campos"><label>Número da linha do cabeçalho<input type="text" id="mLinhaCab" value="1"></label>'
+    + papeis.map(([k, t]) => '<label>' + t + '<select id="mCol_' + k + '">' + opcoes + '</select></label>').join('') + '</div>'
+    + '<div class="linha"><button class="btn prim" data-acao="usar-mapeamento">Usar este mapeamento</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+function usarMapeamento() {
+  const colunas = {};
+  ['descricao', 'qtd', 'preco_unit', 'codigo', 'un', 'desconto_pct', 'total'].forEach(k => { const v = $('mCol_' + k).value; if (v !== '') colunas[k] = Number(v); });
+  if (colunas.descricao === undefined || colunas.qtd === undefined || colunas.preco_unit === undefined) return aviso('Escolha as colunas de descrição, quantidade e preço unitário.');
+  const linhaCab = Number($('mLinhaCab').value) - 1;
+  if (!Number.isInteger(linhaCab) || linhaCab < 0) return aviso('Informe o número da linha do cabeçalho (1 é a primeira).');
+  try { ui.rascunho.d = LeitorPlanilha.extrair(ui.rascunho.rows, { linhaCab, colunas }); modalPreviaCotacao(); }
+  catch (e) { aviso(e.message); }
+}
+function modalIA() {
+  abrirModal('<h2>Formato ainda não conhecido</h2><div class="sub">Este PDF não é de um fornecedor que o sistema já sabe ler. Sem custo, use o claude.ai:</div>'
+    + '<ol><li><button class="btn pq" data-acao="copiar-prompt">Copiar o texto de instrução</button></li><li>Abra <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>, anexe o PDF e cole a instrução.</li><li>Copie a resposta (JSON) e cole aqui:</li></ol>'
+    + '<textarea id="mJson" placeholder="Cole aqui o JSON que o claude.ai devolveu"></textarea>'
+    + '<div class="linha"><button class="btn prim" data-acao="usar-json">Usar este JSON</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+function usarJSON() {
+  try { ui.rascunho.d = Leitor.lerJSONColado($('mJson').value); modalPreviaCotacao(); } catch (e) { aviso(e.message); }
+}
+function adivinharFornecedor(d) {
+  const alvo = [d.fornecedor_curto, d.fornecedor].filter(Boolean).map(norm);
+  return S.fornecedores.find(f => {
+    const n = norm(f.nome); if (!n) return false;
+    return alvo.some(a => a === n || a.includes(n) || n.includes(a) || (() => { const tf = n.split(' ').filter(t => t.length > 1), ta = new Set(a.split(' ')); return tf.length && tf.filter(t => ta.has(t)).length / tf.length >= 0.7; })());
+  });
+}
+function modalPreviaCotacao() {
+  const d = ui.rascunho.d, v = Leitor.validar(d), oc = ocAtual(), g = adivinharFornecedor(d);
+  if (d.oc_numero && d.oc_numero !== String(oc.numero).trim()) { v.avisos.unshift({ nivel: 'erro', msg: 'Esta planilha é da OC ' + d.oc_numero + ', e você está na OC ' + oc.numero + '. Confira se escolheu o arquivo e a OC certos.' }); v.ok = false; }
+  ui.rascunho.v = v;
+  abrirModal('<h2>Cotação lida' + (d.tipo === 'ia' ? ' (via claude.ai · confira tudo)' : d.tipo === 'planilha' ? ' (planilha)' : '') + '</h2>'
+    + '<div class="sub">Documento: ' + esc(d.fornecedor) + ' · emissão ' + dataBR(d.data_emissao) + ' · ' + (d.validade ? esc(d.validade) : 'sem validade') + ' · pagamento: ' + esc(d.pagamento || '—') + ' · frete ' + brl(d.frete) + ' · despesas ' + brl(d.despesas_acessorias) + ' · <b>total ' + brl(d.total_documento) + '</b></div>'
+    + (d.colunas_lidas ? '<div class="sub">Colunas lidas: ' + d.colunas_lidas.map(esc).join(' · ') + '</div>' : '')
+    + tabelaPrevia(d.itens, 'cot') + listaAvisos(v)
+    + '<div class="campos"><label>Fornecedor<select id="mForn"><option value="novo">Novo fornecedor</option>' + S.fornecedores.map(f => '<option value="' + esc(f.id) + '"' + (g && g.id === f.id ? ' selected' : '') + '>' + esc(f.nome) + '</option>').join('') + '</select></label>'
+    + '<label>Nome do novo fornecedor<input type="text" id="mFornNome" value="' + esc(d.fornecedor_curto || d.fornecedor || '') + '" placeholder="ex.: Casa do Construtor"></label></div>'
+    + (v.ok ? '' : '<label class="sub"><input type="checkbox" id="mIgnora"> Salvar mesmo com as contas que não fecham (vou conferir no PDF)</label>')
+    + '<div class="linha"><button class="btn prim" data-acao="cot-salvar">Salvar e casar com a OC ' + esc(oc.numero) + '</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+async function salvarCotacao() {
+  try {
+    const r = ui.rascunho, d = r.d, oc = ocAtual();
+    if (!r.v.ok && !($('mIgnora') && $('mIgnora').checked)) return aviso('Há contas que não fecham. Marque a opção para salvar mesmo assim.');
+    let fid = $('mForn').value;
+    if (fid === 'novo') {
+      const regra = (d.observacoes || []).filter(o => /ICMS/i.test(o)).join(' ');
+      fid = (await Banco.salvarFornecedor({ nome: $('mFornNome').value, regra_icms: regra })).id;
+    }
+    await recarregar();
+    const res = Casa.casar({ ocItens: oc.itens, itens: d.itens, fornecedorId: fid, dicionario: S.dic, forcarConfirmar: d.tipo === 'ia' });
+    const itens = linhasDe(d, res);
+    const { id } = await Banco.salvarCotacao({
+      cotacao: { oc_id: oc.id, fornecedor_id: fid, data_emissao: d.data_emissao || '', validade: d.validade || '', validade_ate: d.validade_ate || '', pagamento: d.pagamento || '',
+        frete: d.frete == null ? '' : d.frete, despesas: d.despesas_acessorias == null ? '' : d.despesas_acessorias, desconto_pct: '', acrescimo_pct: '', incluir_despesas: true,
+        observacoes: d.observacoes || [], total_documento: d.total_documento, tipo: d.tipo, arquivo_origem: r.nome || '' },
+      itens
+    });
+    pdfs.set(id, { url: r.url, nome: r.nome });
+    const keep = ui.rascunho; ui.rascunho = null; fecharModal(); ui.aba = 'mapa'; await recarregar(); render();
+    aviso('Cotação salva: ' + res.vinculos.length + ' de ' + oc.itens.length + ' itens da OC cotados' + (res.fora_da_oc.length ? ', ' + res.fora_da_oc.length + ' fora da OC' : '') + '.'); void keep;
+  } catch (e) { aviso(e.message); }
+}
+function linhasDe(d, res) {
+  return d.itens.map((it, k) => {
+    const v = res.vinculos.find(x => x.idx === k);
+    let fator = it.fator_unidade || 1, emb = it.embalagem || '';
+    const fx = fator === 1 ? Casa.fatorFixo(it.descricao_curta || it.descricao) : null;
+    if (fx) { fator = fx.fator; emb = fx.motivo; }
+    return { linha: k, codigo: it.codigo, descricao_original: it.descricao, descricao_curta: it.descricao_curta || it.descricao, un: it.un || '', qtd_cotada: it.qtd, preco_unit: it.preco_unit, total: it.total,
+      fator_unidade: fator, embalagem: emb, item_oc_n: v ? v.oc_n : '', status: v ? v.status : 'sem_cotacao', nota: v ? v.notas.join(' | ') : '' };
+  });
+}
+const cotSemItens = c => { const o = Object.assign({}, c); delete o.itens; return o; };
+
+/* ============================== ações ============================== */
+async function aprender(cot, linha, ocItem) {
+  if (!ocItem.material_id) { aviso('Vínculo salvo. Para o sistema aprender, preencha o código do insumo no item ' + ocItem.n + ' (aba Itens da OC).'); return; }
+  await Banco.gravarDicionario([Casa.registroDicionario(cot.fornecedor_id, linha, ocItem, 'usuário')]);
+  aviso('Vínculo salvo e gravado no dicionário.');
+}
+async function relink(cotId, n, valor) {
+  const cot = S.cotacoes.find(c => c.id === cotId), oc = ocAtual();
+  const itens = cot.itens.map(i => Object.assign({}, i));
+  itens.forEach(i => { if (Number(i.item_oc_n) === n) { i.item_oc_n = ''; i.status = 'sem_cotacao'; i.nota = ''; } });
+  let novo = null;
+  if (valor !== 'none') { novo = itens.find(i => String(i.linha) === valor); novo.item_oc_n = n; novo.status = 'manual'; novo.nota = ''; }
+  await Banco.salvarCotacao({ cotacao: cotSemItens(cot), itens });
+  if (novo) await aprender(cot, novo, oc.itens.find(i => i.n === n));
+  await recarregar(); render();
+}
+async function aceitar(cotId, n) {
+  const cot = S.cotacoes.find(c => c.id === cotId), oc = ocAtual();
+  const itens = cot.itens.map(i => Object.assign({}, i)), li = itens.find(i => Number(i.item_oc_n) === n);
+  li.status = 'manual';
+  await Banco.salvarCotacao({ cotacao: cotSemItens(cot), itens });
+  await aprender(cot, li, oc.itens.find(i => i.n === n));
+  await recarregar(); render();
+}
+async function atualizarCot(id, campos, itensNovos) {
+  const cot = S.cotacoes.find(c => c.id === id);
+  await Banco.salvarCotacao({ cotacao: Object.assign(cotSemItens(cot), campos), itens: itensNovos || cot.itens });
+  await recarregar(); render();
+}
+async function recasar(id) {
+  const cot = S.cotacoes.find(c => c.id === id), oc = ocAtual(), planilha = cot.tipo === 'planilha';
+  if (!confirm(planilha
+    ? 'Refazer o casamento só das linhas que ainda não conferem? Os vínculos que já conferem ou que você confirmou à mão ficam como estão.'
+    : 'Refazer o casamento desta cotação? Os vínculos atuais, inclusive os que você ajustou à mão, serão recalculados com o dicionário.')) return;
+  // Em planilha (OC padrão) o vínculo vem do código do Obra Prima, que não é guardado por linha: preserva o que já está certo.
+  const manter = planilha ? new Set(cot.itens.filter(i => i.item_oc_n !== '' && (i.status === 'confere' || i.status === 'manual')).map(i => i.linha)) : new Set();
+  const usados = new Set(cot.itens.filter(i => manter.has(i.linha)).map(i => Number(i.item_oc_n)));
+  const livres = cot.itens.filter(i => !manter.has(i.linha));
+  const d = { itens: livres.map(i => ({ codigo: i.codigo, descricao: i.descricao_original, descricao_curta: i.descricao_curta, un: i.un, qtd: i.qtd_cotada, preco_unit: i.preco_unit, total: i.total, fator_unidade: i.fator_unidade, embalagem: i.embalagem })) };
+  const res = Casa.casar({ ocItens: oc.itens.filter(i => !usados.has(i.n)), itens: d.itens, fornecedorId: cot.fornecedor_id, dicionario: S.dic, forcarConfirmar: cot.tipo === 'ia' });
+  const novas = linhasDe(d, res).map((x, k) => Object.assign(x, { linha: livres[k].linha }));
+  const itens = cot.itens.map(i => manter.has(i.linha) ? i : novas.find(x => x.linha === i.linha));
+  await atualizarCot(id, {}, itens);
+  aviso('Casamento refeito: ' + itens.filter(i => i.item_oc_n !== '').length + ' de ' + oc.itens.length + ' itens cotados.');
+}
+function copiarMapa() {
+  const oc = ocAtual(), cots = S.cotacoes, cab = ['Item', 'Descrição da OC', 'Qtd. OC'];
+  cots.forEach(c => { const n = nomeForn(c.fornecedor_id); cab.push(n + ' código', n + ' descrição', n + ' total', n + ' status'); });
+  cab.push('Menor preço');
+  const L = [cab.join('\t')];
+  oc.itens.forEach(it => {
+    const custos = cots.map(c => { const lk = linhaDe(c, it.n); return lk ? custo(c, lk, it.qtd) : null; });
+    const val = custos.filter(v => v !== null), min = val.length > 1 ? Math.min(...val) : null;
+    const f = [it.n, it.descricao, String(it.qtd).replace('.', ',')];
+    cots.forEach((c, k) => { const lk = linhaDe(c, it.n); f.push(lk ? lk.codigo : '', lk ? lk.descricao_curta : '', custos[k] === null ? '' : String(custos[k].toFixed(2)).replace('.', ','), lk ? statusRotulo(lk.status) : 'Não cotado'); });
+    f.push(min !== null && val.filter(v => v === min).length === 1 ? nomeForn(cots[custos.indexOf(min)].fornecedor_id) : '');
+    L.push(f.join('\t'));
+  });
+  const t = ['', 'Total (com frete e despesas, se incluídas)', ''];
+  cots.forEach(c => { t.push('', '', totalCot(c, oc).total.toFixed(2).replace('.', ','), ''); }); t.push('');
+  L.push(t.join('\t'));
+  const texto = L.join('\n');
+  (navigator.clipboard ? navigator.clipboard.writeText(texto) : Promise.reject()).then(() => aviso('Copiado. Cole no Excel ou no Google Planilhas.'), () => {
+    abrirModal('<h2>Copie o mapa</h2><textarea id="mTsv" readonly>' + esc(texto) + '</textarea><div class="linha"><button class="btn" data-acao="fechar-modal">Fechar</button></div>'); $('mTsv').select();
+  });
+}
+
+
+/* ---------- conexão ---------- */
+function atualizarSelo() {
+  const remoto = Banco.modo === 'planilha';
+  $('selo').textContent = remoto ? 'PLANILHA GOOGLE' : 'CÓPIA LOCAL';
+  $('selo').title = remoto ? 'Os dados ficam na planilha do Google.' : 'Os dados ficam só neste navegador. Nada é enviado a servidor.';
+  $('btnLimpar').style.display = remoto ? 'none' : '';
+}
+function modalConexao() {
+  const c = lerCfg(), remoto = c.modo === 'planilha';
+  abrirModal('<h2>Onde ficam os dados</h2>'
+    + '<label class="sub"><input type="radio" name="mModo" value="local"' + (remoto ? '' : ' checked') + '> <b>Cópia local</b>: só neste navegador, para testar.</label>'
+    + '<label class="sub"><input type="radio" name="mModo" value="planilha"' + (remoto ? ' checked' : '') + '> <b>Planilha do Google</b>: compartilhada, com histórico.</label>'
+    + '<div class="campos"><label>URL do app da web (termina em /exec)<input type="text" id="mUrl" value="' + esc(c.url || '') + '" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>'
+    + '<label>Token<input type="password" id="mToken" value="' + esc(lerToken()) + '" placeholder="o token das Propriedades do script" autocomplete="off"></label></div>'
+    + '<label class="sub"><input type="checkbox" id="mLembrar"' + (localStorage.getItem('tmx_token') ? ' checked' : '') + '> Lembrar o token neste computador (se desmarcado, será pedido ao fechar o navegador)</label>'
+    + '<div class="sub">O token nunca vai para o código da página. Não marque a opção acima em computador de uso compartilhado.</div>'
+    + '<div class="linha"><button class="btn prim" data-acao="conexao-salvar">Conectar</button><button class="btn" data-acao="conexao-criar-abas">Criar/atualizar abas da planilha</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+async function salvarConexao(soCriarAbas) {
+  const modo = (document.querySelector('input[name="mModo"]:checked') || {}).value;
+  if (modo === 'local' && !soCriarAbas) {
+    localStorage.setItem(CFG, JSON.stringify({ modo: 'local', url: $('mUrl').value.trim() }));
+    Banco = abrirBanco(); fecharModal(); ui.ocId = null; ui.tela = 'ocs'; await recarregar(); atualizarSelo(); render(); return aviso('Usando a cópia local.');
+  }
+  const url = $('mUrl').value.trim(), token = $('mToken').value;
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) return aviso('A URL deve ser a do app da web, no formato https://script.google.com/macros/s/…/exec');
+  if (!token) return aviso('Informe o token.');
+  const teste = TMXBanco.criarRemoto({ url, token, aoOcupar: marcarOcupado });
+  try {
+    if (soCriarAbas) { const r = await teste.criarAbas(); return aviso('Abas conferidas. Criadas agora: ' + (r.criadas.length ? r.criadas.join(', ') : 'nenhuma (já existiam)') + '.'); }
+    await teste.testar();
+  } catch (e) {
+    return aviso(/Aba ausente/.test(e.message) ? 'Conectou, mas as abas ainda não existem. Use "Criar/atualizar abas da planilha".' : e.message);
+  }
+  try { sessionStorage.removeItem('tmx_token'); localStorage.removeItem('tmx_token'); ($('mLembrar').checked ? localStorage : sessionStorage).setItem('tmx_token', token); } catch (e) { /* sem armazenamento: pede de novo na próxima vez */ }
+  localStorage.setItem(CFG, JSON.stringify({ modo: 'planilha', url }));
+  Banco = abrirBanco(); fecharModal(); ui.ocId = null; ui.tela = 'ocs'; await recarregar(); atualizarSelo(); render(); aviso('Conectado à planilha.');
+}
+
+/* ============================== eventos ============================== */
+let emAndamento = false;
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-acao]'); if (!el) return;
+  const a = el.dataset.acao, v = el.dataset.v, id = el.dataset.id, n = el.dataset.n ? Number(el.dataset.n) : null;
+  if (a === 'tela' || a === 'abrir-oc') e.preventDefault();
+  // Uma ação por vez: com a planilha, gravar leva segundos e um segundo clique duplicaria o registro.
+  const LIVRES = ['fechar-modal', 'fechar-pdf', 'conexao', 'aba', 'copiar-prompt', 'copiar-mapa', 'baixar-mapa'];
+  if (emAndamento && LIVRES.indexOf(a) < 0) return aviso('Aguarde, ainda estou gravando…');
+  if (LIVRES.indexOf(a) < 0) { emAndamento = true; if (el.tagName === 'BUTTON') el.disabled = true; }
+  try {
+    if (a === 'tela') { ui.tela = v; if (v !== 'oc') ui.ocId = null; ui.pdfAberto = null; await recarregar(); render(); }
+    else if (a === 'abrir-oc') { ui.ocId = v; ui.tela = 'oc'; ui.aba = 'mapa'; ui.pdfAberto = null; await recarregar(); render(); }
+    else if (a === 'aba') { ui.aba = v; render(); }
+    else if (a === 'conexao') modalConexao();
+    else if (a === 'conexao-salvar') await salvarConexao(false);
+    else if (a === 'conexao-criar-abas') await salvarConexao(true);
+    else if (a === 'oc-importar') { $('arqOC').value = ''; $('arqOC').click(); }
+    else if (a === 'oc-manual') ocManual();
+    else if (a === 'oc-manual-salvar') await salvarOCManual();
+    else if (a === 'oc-salvar-importada') await salvarOCImportada();
+    else if (a === 'oc-padrao') {
+      const r = OCPadrao.baixar(ocAtual());
+      aviso('Planilha gerada: ' + r.nomeArquivo + '.' + (r.itensSemCodigo ? ' ' + r.itensSemCodigo + ' item(ns) sem código do Obra Prima: preencha na aba Itens da OC e gere de novo para o casamento ficar exato.' : ''));
+    }
+    else if (a === 'cot-adicionar') { $('arqCot').value = ''; $('arqCot').click(); }
+    else if (a === 'copiar-prompt') { try { await navigator.clipboard.writeText(Leitor.montarPromptExtracao()); aviso('Instrução copiada.'); } catch (x) { $('mJson').value = Leitor.montarPromptExtracao(); aviso('Copie o texto que apareceu na caixa e depois apague.'); } }
+    else if (a === 'usar-json') usarJSON();
+    else if (a === 'usar-mapeamento') usarMapeamento();
+    else if (a === 'cot-salvar') await salvarCotacao();
+    else if (a === 'fechar-modal') fecharModal();
+    else if (a === 'ver-pdf') { ui.pdfAberto = id; renderLateral(); }
+    else if (a === 'fechar-pdf') { ui.pdfAberto = null; renderLateral(); }
+    else if (a === 'recasar') await recasar(id);
+    else if (a === 'aceitar') await aceitar(id, n);
+    else if (a === 'aplicar-desc-oc') await atualizarCot(id, { desconto_pct: Number(v) });
+    else if (a === 'baixar-mapa') {
+      const oc = ocAtual(), r = ExportarMapa.baixar({ oc, cotacoes: S.cotacoes, nomeForn, alertas: alertasEmTexto(oc, S.cotacoes), hoje: hoje() });
+      aviso('Mapa exportado: ' + r.nomeArquivo + '.');
+    }
+    else if (a === 'copiar-mapa') copiarMapa();
+    else if (a === 'cot-excluir') { if (confirm('Excluir esta cotação?')) { await Banco.excluirCotacao(id); await recarregar(); render(); } }
+    else if (a === 'oc-excluir') { if (confirm('Excluir a OC e todas as cotações dela?')) { await Banco.excluirOC(ui.ocId); ui.ocId = null; ui.tela = 'ocs'; await recarregar(); render(); } }
+    else if (a === 'oc-item-add') { const oc = ocAtual(); oc.itens.push({ oc_id: oc.id, n: Math.max(0, ...oc.itens.map(i => i.n)) + 1, material_id: '', descricao: 'Novo item', qtd: 1, unidade: 'UN' }); await Banco.salvarOC({ oc: ocSemItens(oc), itens: oc.itens }); await recarregar(); render(); }
+    else if (a === 'oc-item-del') { const oc = ocAtual(); await Banco.salvarOC({ oc: ocSemItens(oc), itens: oc.itens.filter(i => i.n !== n) }); await recarregar(); render(); }
+    else if (a === 'forn-novo') { await Banco.salvarFornecedor({ nome: 'Novo fornecedor' }); await recarregar(); render(); }
+    else if (a === 'dic-del') { const d = S.dic[Number(v)]; await Banco.excluirDicionario({ fornecedor_id: d.fornecedor_id, codigo_fornecedor: d.codigo_fornecedor, descricao_normalizada: d.descricao_normalizada }); await recarregar(); render(); }
+    else if (a === 'limpar-local') { if (Banco.modo !== 'local') return aviso('Isto só apaga a cópia local. Os dados da planilha ficam no Google.'); if (confirm('Apagar TODOS os dados desta cópia local (OCs, cotações, fornecedores e dicionário)? Isso não pode ser desfeito.')) { await Banco.limpar(); ui.ocId = null; ui.tela = 'ocs'; await recarregar(); render(); aviso('Cópia local apagada.'); } }
+  } catch (err) { aviso(err.message || String(err)); }
+  finally { emAndamento = false; if (el.isConnected && el.tagName === 'BUTTON') el.disabled = false; }
+});
+const ocSemItens = o => { const c = Object.assign({}, o); delete c.itens; return c; };
+
+document.addEventListener('change', async e => {
+  const el = e.target.closest('[data-campo]'); if (!el) return;
+  const c = el.dataset.campo, id = el.dataset.id;
+  try {
+    if (c === 'relink') { if (el.value) await relink(id, Number(el.dataset.n), el.value); }
+    else if (c === 'cot-desc') await atualizarCot(id, { desconto_pct: lerNum(el.value) });
+    else if (c === 'cot-acr') await atualizarCot(id, { acrescimo_pct: lerNum(el.value) });
+    else if (c === 'cot-icms') await atualizarCot(id, { acrescimo_pct: el.value === '' ? '' : Number(el.value) });
+    else if (c === 'cot-desp') await atualizarCot(id, { incluir_despesas: el.checked });
+    else if (c === 'fator') {
+      const f = lerNum(el.value); if (!(f > 0)) return aviso('O fator deve ser maior que zero.');
+      const cot = S.cotacoes.find(x => x.id === id);
+      await atualizarCot(id, {}, cot.itens.map(i => i.linha === Number(el.dataset.linha) ? Object.assign({}, i, { fator_unidade: f }) : i));
+    }
+    else if (c === 'oc-item') {
+      const oc = ocAtual(), f = el.dataset.f, n = Number(el.dataset.n);
+      const itens = oc.itens.map(i => i.n === n ? Object.assign({}, i, { [f]: f === 'qtd' ? lerNum(el.value) : el.value }) : i);
+      await Banco.salvarOC({ oc: ocSemItens(oc), itens }); await recarregar();
+    }
+    else if (c === 'forn') { const f = S.fornecedores.find(x => x.id === id); await Banco.salvarFornecedor(Object.assign({}, f, { [el.dataset.f]: el.value })); await recarregar(); }
+  } catch (err) { aviso(err.message || String(err)); await recarregar(); render(); }
+});
+$('arqOC').addEventListener('change', e => { if (e.target.files[0]) importarOC(e.target.files[0]); });
+$('arqCot').addEventListener('change', e => { if (e.target.files[0]) lerCotacao(e.target.files[0]); });
+$('modal').addEventListener('click', e => { if (e.target === $('modal')) fecharModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('modal').classList.contains('aberto')) fecharModal(); else if (ui.pdfAberto) { ui.pdfAberto = null; renderLateral(); } } });
+
+atualizarSelo();
+(async () => {
+  const c = lerCfg();
+  if (c.modo === 'planilha' && !lerToken()) { Banco = TMXBanco.criarLocal(localStorage); await recarregar().catch(() => {}); render(); atualizarSelo(); modalConexao(); aviso('Digite o token para conectar à planilha.'); return; }
+  try { await recarregar(); } catch (e) { aviso(e.message); }
+  render();
+})();
+</script>
+</body>
+</html>

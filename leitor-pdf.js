@@ -80,6 +80,7 @@
     const t = linhas.map(texto).join('\n');
     if (/Documento Auxiliar de Venda/i.test(t) && /Vl\. Total/.test(t)) return 'jk';
     if (/ORÇAMENTO N°/.test(t) && /LIQUIDO/.test(t) && /Raz[aã]o Empresa/i.test(t)) return 'tambasa';
+    if (/Descrição do Produto:/.test(t) && /Vlr\. Unit\./.test(t) && /Vlr\. Total/.test(t) && /Qntd\. itens:/.test(t)) return 'felt';
     if (/ORDEM DE COMPRA\s+\d+/.test(t) && /Subtotal \(R\$\)/.test(t)) return 'oc';
     return null;
   }
@@ -88,6 +89,7 @@
     const tipo = detectar(linhas);
     if (tipo === 'jk') return lerJK(linhas);
     if (tipo === 'tambasa') return lerTambasa(linhas);
+    if (tipo === 'felt') return lerFelt(linhas);
     if (tipo === 'oc') return lerOC(linhas);
     return null;
   }
@@ -222,6 +224,83 @@
       despesas_acessorias: desp ? numBR(desp[1]) : null,
       observacoes: obs,
       total_documento: totalL ? ultimoNumero(totalL) : null,
+      itens: saida
+    };
+  }
+
+
+  // ------------------------------------------------------------ Felt Elétrica (e outras lojas do mesmo sistema)
+
+  function lerFelt(linhas) {
+    const cab = linhas.find(l => l.itens.some(i => i.s === 'Vlr. Total') && l.itens.some(i => i.s === 'Vlr. Unit.') && l.itens.some(i => i.s === 'Qtd.'));
+    if (!cab) throw new Error('Cabeçalho da tabela não encontrado (Felt).');
+    const x = nome => cab.itens.find(i => i.s === nome).x;
+    const xNcm = x('NCM') - 8, xMarca = x('Marca') - 5, xQtd = x('Qtd.') - 15, xUnit = x('Vlr. Unit.') - 8, xTot = x('Vlr. Total') - 17;
+    const dinheiro = v => numBR(String(v).replace(/^R\$\s*/, ''));
+    const entre = (l, a, b) => l.itens.filter(i => i.x >= a && i.x < b).map(i => i.s).join(' ').trim();
+    const iCab = linhas.indexOf(cab);
+
+    const itens = [];
+    let fimTabela = false, atual = null;
+    for (const l of linhas.slice(iCab + 1)) {
+      if (fimTabela) break;
+      const t = texto(l);
+      if (/^Qntd\. itens:/.test(t)) { fimTabela = true; continue; }
+      const cod = l.itens[0];
+      if (/^\d{1,9}$/.test(cod.s) && cod.x < 62) {
+        const desc = entre(l, 62, xNcm), marca = entre(l, xMarca, xQtd);
+        const qtd = numBR(entre(l, xQtd, xUnit)), unit = dinheiro(entre(l, xUnit, xTot)), total = dinheiro(entre(l, xTot, 9999));
+        if (qtd === null || unit === null || total === null) throw new Error('Linha do código ' + cod.s + ' (Felt): colunas numéricas não reconhecidas.');
+        // o preço unitário impresso é arredondado em centavos; o real sai do total
+        const real = total / qtd;
+        atual = { codigo: cod.s, desc, marca, ncm: entre(l, xNcm, xMarca), qtd, unit, total, real, consistente: Math.abs(real - unit) <= 0.0051 };
+        itens.push(atual);
+      } else if (atual && l.itens.every(i => i.x >= 62 && i.x < xNcm)) {
+        atual.desc += ' ' + t;          // linha extra da descrição
+      }
+    }
+
+    const saida = itens.map(it => {
+      const nome = (it.desc + (it.marca ? ' · ' + it.marca : '')).trim();
+      return {
+        codigo: it.codigo, descricao: nome, descricao_curta: nome, un: null, qtd: it.qtd,
+        // se o preço impresso não é coerente com o total, mantém o impresso para a validação acusar
+        preco_unit: it.consistente ? Math.round(it.real * 1e6) / 1e6 : it.unit,
+        desconto_pct: null, total: it.total, fator_unidade: 1, embalagem: null
+      };
+    });
+
+    // dados do documento, por posição (cada rótulo tem o valor logo abaixo)
+    const todos = [];
+    linhas.forEach(l => l.itens.forEach(i => todos.push({ s: i.s, x: i.x, y: i.y, pag: l.pag })));
+    const rotulo = nome => todos.find(i => i.s === nome);
+    const datas = todos.filter(i => /^\d{2}\/\d{2}\/\d{4}( \d{2}:\d{2}:\d{2})?$/.test(i.s));
+    const valorAbaixo = nome => {
+      const r = rotulo(nome); if (!r) return null;
+      const c = datas.filter(d => d.pag === r.pag && d.y < r.y && r.y - d.y < 20).sort((a, b) => Math.abs(a.x - r.x) - Math.abs(b.x - r.x))[0];
+      return c && Math.abs(c.x - r.x) < 60 ? c.s : null;
+    };
+    const emissao = valorAbaixo('Data emissão:'), validade = valorAbaixo('Data de Validade:');
+    const topo = linhas.filter(l => l.pag === 1 && l.y > 815).map(l => l.itens.filter(i => i.x >= 0 && i.s.length >= 3).map(i => i.s).join(' ')).filter(Boolean)[0] || null;
+    const linhaDe = re => linhas.find(l => re.test(texto(l)));
+    const iPg = linhas.findIndex(l => /^Forma de Pagamento:/.test(texto(l)));
+    const pgto = iPg >= 0 ? linhas.slice(iPg + 1, iPg + 3).map(l => l.itens.filter(i => i.x < 400).map(i => i.s).join(' ').trim()).filter(Boolean) : [];
+    const totalL = linhas.find(l => l.itens.some(i => i.s === 'TOTAL:'));
+    const declL = linhaDe(/^Qntd\. itens:/);
+    const iObs = linhas.findIndex(l => l.itens.some(i => i.s === 'Observação:'));
+    const orc = linhaDe(/^Orçamento:/);
+    const obs = [];
+    if (orc) obs.push(texto(orc).replace(/^Orçamento:\s*/, 'Orçamento nº '));
+    if (iObs >= 0 && linhas[iObs + 1]) obs.push('Observação: ' + linhas[iObs + 1].itens.filter(i => i.x < 400).map(i => i.s).join(' '));
+    linhas.forEach(l => { const t = texto(l); if (/^- /.test(t)) obs.push(t.replace(/^- /, '')); });
+
+    return {
+      tipo: 'felt', fornecedor_curto: topo, fornecedor: topo,
+      data_emissao: emissao ? dataISO(emissao) : null,
+      validade: validade ? 'Válido até ' + validade : null, validade_ate: validade ? dataISO(validade) : null,
+      pagamento: pgto.length ? pgto.join(' · ') : null, frete: null, despesas_acessorias: null, observacoes: obs,
+      total_documento: totalL ? dinheiro(totalL.itens[totalL.itens.length - 1].s) : null,
+      itens_declarados: declL ? numBR(declL.itens[declL.itens.length - 1].s) : null,
       itens: saida
     };
   }
@@ -374,6 +453,7 @@
       d.itens.forEach(i => {
         if (Math.abs(r2(i.qtd * i.preco_unit) - i.total) > 0.011) add('erro', 'Item ' + i.codigo + ': qtd × preço ≠ total.');
       });
+      if (d.itens_declarados !== undefined && d.itens_declarados !== null && d.itens_declarados !== d.itens.length) add('erro', 'O documento declara ' + d.itens_declarados + ' itens, mas foram lidos ' + d.itens.length + '.');
       const soma = r2(d.itens.reduce((s, i) => s + i.total, 0));
       const alvo = d.tipo === 'jk' ? d.total_documento - (d.frete || 0) : d.total_documento;
       if (alvo !== null && Math.abs(soma - alvo) > 0.011) add('erro', 'Soma dos itens ' + soma + ' difere do total do documento ' + alvo + '.');
@@ -384,7 +464,7 @@
     return { ok: !avisos.some(a => a.nivel === 'erro'), avisos };
   }
 
-  const api = { numBR, dataISO, agruparLinhas, lerArquivo, detectar, ler, lerJK, lerTambasa, lerOC, validar, montarPromptExtracao, lerJSONColado };
+  const api = { numBR, dataISO, agruparLinhas, lerArquivo, detectar, ler, lerJK, lerTambasa, lerFelt, lerOC, validar, montarPromptExtracao, lerJSONColado };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.LeitorPDF = api;
 })(typeof window !== 'undefined' ? window : this);

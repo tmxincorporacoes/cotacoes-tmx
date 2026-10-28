@@ -1,0 +1,417 @@
+<title>Mapa de Cotação OC 011890</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: mapa de cotação, uma linha por item da OC e um bloco por fornecedor, resumo no topo */
+:root{
+  --bg:#f2f5f5; --surface:#ffffff; --ink:#14262b; --muted:#566a70; --line:#d5dddf;
+  --accent:#0b5f73; --accent-soft:#dcecef; --accent-ink:#ffffff;
+  --ok:#1b6f45; --ok-bg:#dff1e6; --warn:#8a5200; --warn-bg:#fbecd0; --none:#5d6e73; --none-bg:#e6ebed;
+  --font-display:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-body:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-data:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1b1f; --surface:#16262b; --ink:#e4eef0; --muted:#93a9af; --line:#2a4047;
+    --accent:#5cc2d9; --accent-soft:#17363f; --accent-ink:#06222a;
+    --ok:#6fd09a; --ok-bg:#163826; --warn:#f0b44e; --warn-bg:#3a2c10; --none:#93a9af; --none-bg:#223338;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1b1f; --surface:#16262b; --ink:#e4eef0; --muted:#93a9af; --line:#2a4047;
+  --accent:#5cc2d9; --accent-soft:#17363f; --accent-ink:#06222a;
+  --ok:#6fd09a; --ok-bg:#163826; --warn:#f0b44e; --warn-bg:#3a2c10; --none:#93a9af; --none-bg:#223338;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-body);
+  padding-block:28px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+.eyebrow{font:500 .75rem/1 var(--font-data);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(1.7rem,4.5vw,2.4rem)/1.1 var(--font-display);letter-spacing:-.02em;margin:.5rem 0 .7rem;text-wrap:balance}
+h2{font:700 1.15rem/1.25 var(--font-display);margin:0 0 4px;text-wrap:balance}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+.sec-note{color:var(--muted);margin:0 0 12px;max-width:72ch;font-size:.92rem}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.card.hl{background:var(--accent-soft);border-color:transparent}
+.card .k{font:600 .72rem/1.3 var(--font-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.card .big{font:500 1.7rem/1.15 var(--font-data);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.card .sub{color:var(--muted);font-size:.86rem}
+.card .sub b{color:var(--ink);font-weight:600}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 16px}
+.controls label{display:flex;gap:8px;align-items:center;font-size:.9rem;cursor:pointer}
+.controls input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.btns{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center}
+button{font:600 .85rem var(--font-display);padding:8px 12px;border-radius:5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#msg{font-size:.82rem;color:var(--muted)}
+#tsv{width:100%;margin-top:10px;font:400 .78rem/1.4 var(--font-data);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:8px}
+
+.map{background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.head,.row{display:grid;grid-template-columns:2.25rem minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.2fr);gap:0 6px;padding:6px 10px}
+.head{font:600 .72rem/1.2 var(--font-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--line);padding-block:10px}
+.head>div{padding:0 10px}
+.row+.row{border-top:1px solid var(--line)}
+.n{font:500 .9rem var(--font-data);color:var(--muted);padding:12px 0 0 6px}
+.item{padding:10px;min-width:0}
+.oc-desc{font-weight:600}
+.oc-qty{font:400 .82rem var(--font-data);color:var(--muted);margin-top:3px}
+.sup{display:flex;flex-direction:column;gap:6px;min-width:0;padding:10px;border-radius:5px}
+.sup.best{background:var(--accent-soft)}
+.top{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.chip{display:inline-block;font:600 .68rem/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;padding:4px 7px;border-radius:3px}
+.chip.ok{color:var(--ok);background:var(--ok-bg)}
+.chip.verificar{color:var(--warn);background:var(--warn-bg)}
+.chip.manual{color:var(--accent);background:var(--accent-soft);outline:1px solid var(--accent)}
+.chip.none{color:var(--none);background:var(--none-bg)}
+.best .chip.manual{background:var(--surface)}
+.besttag{font:600 .78rem var(--font-display);color:var(--accent)}
+.besttag.warn{color:var(--warn)}
+.desc{font-size:.84rem;overflow-wrap:anywhere}
+.cod{font-family:var(--font-data);color:var(--muted)}
+.money{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.money strong{font:500 1.05rem var(--font-data);font-variant-numeric:tabular-nums}
+.calc{font:400 .78rem var(--font-data);color:var(--muted);font-variant-numeric:tabular-nums}
+.nota{font-size:.82rem;color:var(--muted)}
+.nocot{color:var(--muted);font-size:.9rem}
+select{font:500 .8rem var(--font-display);max-width:100%;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:5px 6px;align-self:flex-start}
+.foot{display:grid;grid-template-columns:2.25rem minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.2fr);gap:0 6px;padding:12px 10px;background:var(--bg);border-top:1px solid var(--line);font-size:.86rem}
+.foot>div{padding:0 10px;min-width:0}
+.foot .lab{font:600 .72rem var(--font-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.foot .v{font:500 .95rem var(--font-data);font-variant-numeric:tabular-nums}
+
+@media (max-width:820px){
+  .head{display:none}
+  .row{grid-template-columns:2rem minmax(0,1fr);padding:10px 6px}
+  .sup{grid-column:1 / -1}
+  .sup::before{content:attr(data-label);font:600 .72rem var(--font-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .foot{grid-template-columns:1fr;gap:10px}
+  .foot>div:first-child{display:none}
+}
+
+.flags{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.flags li{padding:12px 16px;display:grid;gap:2px;max-width:100%}
+.flags li+li{border-top:1px solid var(--line)}
+.flags b{font-weight:600}
+.flags span{color:var(--muted);font-size:.92rem}
+
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{text-align:left;padding:9px 14px;border-top:1px solid var(--line);vertical-align:top}
+thead th{border-top:0;background:var(--bg);font:600 .72rem/1.2 var(--font-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+td.mono,.mono{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+td.field{font-weight:600;white-space:nowrap}
+.dict td:not(.field){min-width:190px}
+.empty{padding:14px 16px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">OC 011890 · Golden Ville 4 · 06/10/2026</div>
+    <h1>Mapa de cotação</h1>
+    <p class="lede">Montado a partir dos três PDFs: a ordem de compra e as cotações da J K Materiais e da Tambasa, cada uma no seu formato. Os itens foram casados pela descrição e você pode trocar qualquer vínculo na própria linha.</p>
+  </header>
+
+  <section class="cards" id="summary" aria-live="polite"></section>
+
+  <section>
+    <h2>Ajustes do cálculo</h2>
+    <p class="sec-note">Cada marcação recalcula o mapa inteiro.</p>
+    <div class="controls">
+      <label><input type="checkbox" id="optJkDesc" checked> J K: aplicar o desconto da OC (7,195%)</label>
+      <label><input type="checkbox" id="optTbIcms"> Tambasa: somar 11% (comprador não contribuinte de ICMS)</label>
+      <label><input type="checkbox" id="optTbDesp" checked> Tambasa: incluir despesas acessórias (R$ 8,99)</label>
+      <div class="btns">
+        <span id="msg" role="status"></span>
+        <button type="button" id="reset">Restaurar vínculos sugeridos</button>
+        <button type="button" id="copy" class="primary">Copiar mapa para o Excel</button>
+      </div>
+    </div>
+    <textarea id="tsv" rows="6" readonly hidden aria-label="Mapa em formato de tabela para copiar"></textarea>
+  </section>
+
+  <section>
+    <h2>Itens da OC lado a lado</h2>
+    <p class="sec-note">Totais calculados sobre as quantidades da OC, não sobre as quantidades que cada fornecedor cotou.</p>
+    <div class="map">
+      <div class="head"><div>#</div><div>Item da OC</div><div>J K Materiais</div><div>Tambasa</div></div>
+      <div id="rows"></div>
+      <div class="foot" id="foot"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pontos para confirmar antes de fechar</h2>
+    <p class="sec-note">Itens que o leitor encontrou nos PDFs e que mudam o resultado da comparação.</p>
+    <ul class="flags">
+      <li><b>Produto diferente do pedido na Tambasa</b><span>Nos itens 7, 8 e 9 a Tambasa cotou outra marca ou material (válvulas Ghelplus em inox, válvula de tanque em metal cromado 1 1/4"), e a OC pede Furkin e Amanco PVC 40 mm. No item 2 ela cotou anel de massa Blukit, e a JK cotou anel de cera Amanco. Só os itens 5 e 6 batem com o que a OC descreve.</span></li>
+      <li><b>ICMS na Tambasa</b><span>O rodapé do orçamento diz que o preço vale para contribuintes do ICMS e para pedidos faturados pelas filiais SP, CE e BA. Para os demais clientes, soma 11% nos estados do Sul e Sudeste. A OC não traz inscrição estadual do comprador, então é preciso confirmar qual regra vale. A marcação acima mostra os dois cenários.</span></li>
+      <li><b>Validade e quantidades</b><span>A cotação da JK tem validade de 1 dia a partir de 06/10/2026, e já venceu. A Tambasa é de 29/09/2026, sujeita a confirmação de preço, prazo e estoque, e cotou 1 a 3 unidades por item, contra 10 a 30 na OC. Preço de volume pode mudar.</span></li>
+      <li><b>Desconto registrado na OC</b><span>A OC traz R$ 142,64 de desconto (cerca de 7,2%) sobre a tabela da JK, e o PDF da cotação da JK não mostra esse desconto. Convém confirmar que ela o aceitou. A soma das linhas dá R$ 1.839,95 e o total impresso na OC é R$ 1.839,96, uma diferença de arredondamento de R$ 0,01.</span></li>
+      <li><b>Registro de 32 mm (1") na OC, 3/4 na JK</b><span>A OC descreve o acabamento de registro de 32 mm (1") e a JK cotou o modelo Furkin C40 3/4. Confirmar a bitola antes de comprar 30 peças.</span></li>
+      <li><b>Parafuso castelo vendido em kit de 2</b><span>A JK cobra R$ 4,65 por kit com 2 peças e a Tambasa cobra R$ 2,69 por par. A OC pede "10 unidades". Se forem 10 peças, são 5 kits.</span></li>
+      <li><b>Condições comerciais em aberto</b><span>A OC está sem condição de pagamento e sem previsão de entrega. A JK informa retirada imediata e pagamento à vista. A Tambasa traz a condição em código ("9P 9-P Pz: 1 Pz: 1 001"), que precisa ser esclarecida com o representante.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Itens cotados fora da OC</h2>
+    <p class="sec-note">Linhas que os fornecedores enviaram e que não estão vinculadas a nenhum item da OC.</p>
+    <div class="scroll" id="extras"></div>
+  </section>
+
+  <section>
+    <h2>Como cada fornecedor nomeia os mesmos campos</h2>
+    <p class="sec-note">É esta tabela que o sistema aprende e guarda por fornecedor, para ler a próxima cotação sem ajuste manual.</p>
+    <div class="scroll">
+      <table class="dict">
+        <thead><tr><th>Campo no nosso layout</th><th>OC (nosso layout)</th><th>J K Materiais</th><th>Tambasa</th></tr></thead>
+        <tbody>
+          <tr><td class="field">Código</td><td>não tem</td><td>"Código" (ex.: 2881) e "Cód.Fab."</td><td>"COD." (ex.: 004755-4)</td></tr>
+          <tr><td class="field">Descrição</td><td>"Item"</td><td>"Descrição"</td><td>"PRODUTO", com marca, NCM e código de barras dentro do mesmo campo</td></tr>
+          <tr><td class="field">Unidade</td><td>"Unidades" junto da quantidade</td><td>"UN." e "Emb." (UN)</td><td>"UN" (UN, PR, SC)</td></tr>
+          <tr><td class="field">Quantidade</td><td>"Qtd."</td><td>"Qt."</td><td>"QTD."</td></tr>
+          <tr><td class="field">Preço unitário</td><td>"Unit. (R$)"</td><td>"P.Unit."</td><td>"LIQUIDO". A coluna "UNIT." traz o preço por peça, e em saco com 6 os dois diferem</td></tr>
+          <tr><td class="field">Total da linha</td><td>"Total (R$)"</td><td>"Vl. Total"</td><td>"TOTAL"</td></tr>
+          <tr><td class="field">Desconto</td><td>"Desc. (R$)", em reais</td><td>não aparece</td><td>"DESC.", em % (0,00 %)</td></tr>
+          <tr><td class="field">Frete e extras</td><td>"Frete"</td><td>"Vl.Frete" (0,00)</td><td>"Despesas acessórias" em texto no rodapé (R$ 8,99)</td></tr>
+          <tr><td class="field">Pagamento</td><td>"Cond. pgto." (vazio)</td><td>"Plano de Pagto" (A VISTA)</td><td>"Cond. Pagamento" em código</td></tr>
+          <tr><td class="field">Validade</td><td>não tem</td><td>"Validade 1 dias a partir da data de emissão"</td><td>sem validade, "sujeito a confirmação"</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+/*DATA*/
+const DESC_JK = 0.07195;
+const DESP_TB = 8.99;
+const OC = [
+  {n:1, desc:'Acabamento de registro de 32 mm (1") — FURKIN', qtd:30, preco:23.90, sub:717.00, tot:665.41},
+  {n:2, desc:'Anel de vedação para saída de vaso sanitário', qtd:10, preco:18.43, sub:184.30, tot:171.04},
+  {n:3, desc:'Engate de PVC 50 cm', qtd:30, preco:5.39, sub:161.70, tot:150.07},
+  {n:4, desc:'Fita veda rosca', qtd:2, preco:12.80, sub:25.60, tot:23.76},
+  {n:5, desc:'Parafuso castelo', qtd:10, preco:4.65, sub:46.50, tot:43.15},
+  {n:6, desc:'Sifão de PVC', qtd:30, preco:7.24, sub:217.20, tot:201.57},
+  {n:7, desc:'Válvula americana — FURKIN 1622', qtd:10, preco:29.90, sub:299.00, tot:277.49},
+  {n:8, desc:'Válvula para pia de banheiro — FURKIN MET CROM S/LAD', qtd:10, preco:19.90, sub:199.00, tot:184.68},
+  {n:9, desc:'Válvula para tanque — AMANCO PVC 40MM DIVS', qtd:10, preco:13.23, sub:132.30, tot:122.78}
+];
+const JK = [
+  {id:'j1', cod:'10224', desc:'VALVULA PIA AMERICANA FURKIN 1622 LEVE', un:'UN', qtdCot:10, preco:29.90, totCot:299.00},
+  {id:'j2', cod:'1421', desc:'VALVULA LAV FURKIN MET CROM S/LAD 1603', un:'UN', qtdCot:10, preco:19.90, totCot:199.00},
+  {id:'j3', cod:'1310', desc:'VALVULA TANQUE AMANCO PVC 40MM DIVS', un:'UN', qtdCot:10, preco:13.23, totCot:132.30},
+  {id:'j4', cod:'2881', desc:'ACABAMENTO REGISTRO FURKIN C40 3/4 CR', un:'UN', qtdCot:30, preco:23.90, totCot:717.00},
+  {id:'j5', cod:'3154', desc:'ENGATE PVC 50CM AMANCO', un:'UN', qtdCot:30, preco:5.39, totCot:161.70},
+  {id:'j6', cod:'3968', desc:'SIFAO SANF PVC UNIV AMANCO BRANCO', un:'UN', qtdCot:30, preco:7.24, totCot:217.20},
+  {id:'j7', cod:'12366', desc:'PARAFUSO CASTELO B10 C/02UN TOR ALF', un:'UN', qtdCot:10, preco:4.65, totCot:46.50},
+  {id:'j8', cod:'9366', desc:'ANEL VEDACAO CERA C/GUIA AMANCO', un:'UN', qtdCot:10, preco:18.43, totCot:184.30},
+  {id:'j9', cod:'1150', desc:'FITA VEDA ROSCA AMANCO 18MMX50MT', un:'UN', qtdCot:2, preco:12.80, totCot:25.60}
+];
+const TB = [
+  {id:'t1', cod:'026747-3', desc:'VALVULA PIA AMER.INOX GHELPLU. 31/2', un:'UN', qtdCot:1, preco:16.32, totCot:16.32},
+  {id:'t2', cod:'026746-5', desc:'VALVULA LAV.INOX LUXO GHELPLUS EN', un:'UN', qtdCot:1, preco:16.33, totCot:16.33},
+  {id:'t3', cod:'120651-0', desc:'VALVULA TANQUE MET.CROM.11/4 .1605', un:'UN', qtdCot:1, preco:20.70, totCot:20.70},
+  {id:'t4', cod:'020213-4', desc:'ADAP.CX DAGUA 50X11/2 SL KRONA C6', un:'SC', qtdCot:1, preco:16.12, totCot:96.73, info:'1 saco com 6 · R$ 96,73 o saco (R$ 16,12 a peça)'},
+  {id:'t5', cod:'007179-0', desc:'SIFAO SANF.UNIV.BCO PIA38A50 BLUKT', un:'UN', qtdCot:3, preco:4.70, totCot:14.10},
+  {id:'t6', cod:'004755-4', desc:'PARAFUSO CASTELO 1/4 B10 (PAR)', un:'PR', qtdCot:2, preco:2.69, totCot:5.38},
+  {id:'t7', cod:'071505-1', desc:'VASO SANIT.BC CX.ACOP.S/ASS.HERVY', un:'UN', qtdCot:1, preco:357.06, totCot:357.06},
+  {id:'t8', cod:'071900-0', desc:'ANEL VEDACAO V.SAN.MASSA C/GUIA BLUKIT.', un:'UN', qtdCot:1, preco:5.23, totCot:5.23}
+];
+const DEFAULTS = {
+  1:{jk:{id:'j4',st:'verificar',nota:'A OC pede registro de 32 mm (1"). A JK descreve 3/4. Confirmar a bitola.'}, tb:null},
+  2:{jk:{id:'j8',st:'ok',nota:''}, tb:{id:'t8',st:'verificar',nota:'Anel de massa Blukit. A JK cotou anel de cera Amanco. Confirmar se o material atende.'}},
+  3:{jk:{id:'j5',st:'ok',nota:''}, tb:null},
+  4:{jk:{id:'j9',st:'ok',nota:''}, tb:null},
+  5:{jk:{id:'j7',st:'ok',nota:'Preço por kit com 2 peças (C/02UN).'}, tb:{id:'t6',st:'ok',nota:'Preço por par (PR), 2 peças. Mesma base da JK.'}},
+  6:{jk:{id:'j6',st:'ok',nota:''}, tb:{id:'t5',st:'ok',nota:'Sanfonado universal branco, Blukit. Na JK a marca é Amanco.'}},
+  7:{jk:{id:'j1',st:'ok',nota:''}, tb:{id:'t1',st:'verificar',nota:'Inox 3 1/2", Ghelplus. A OC pede Furkin 1622.'}},
+  8:{jk:{id:'j2',st:'ok',nota:''}, tb:{id:'t2',st:'verificar',nota:'Inox luxo, Ghelplus. A OC pede Furkin metal cromado sem ladrão.'}},
+  9:{jk:{id:'j3',st:'ok',nota:''}, tb:{id:'t3',st:'verificar',nota:'Metal cromado 1 1/4". A OC pede PVC Amanco 40 mm.'}}
+};
+/*ENDDATA*/
+
+const $ = id => document.getElementById(id);
+const brl = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const r2 = v => Math.round((v + Number.EPSILON) * 100) / 100;
+const num = v => v.toFixed(2).replace('.',',');
+const STLABEL = {ok:'Confere', verificar:'Confirmar produto', manual:'Vínculo manual'};
+const SUPNAME = {jk:'J K Materiais', tb:'Tambasa'};
+const clone = o => JSON.parse(JSON.stringify(o));
+let links = clone(DEFAULTS);
+let lastRows = [];
+let lastTotals = null;
+
+const getOpts = () => ({jkDesc:$('optJkDesc').checked, tbIcms:$('optTbIcms').checked, tbDesp:$('optTbDesp').checked});
+const lineOf = (sup,id) => (sup === 'jk' ? JK : TB).find(x => x.id === id);
+
+function calc(sup, id, qtd, o){
+  const L = lineOf(sup, id);
+  let f = 1;
+  if (sup === 'jk' && o.jkDesc) f = 1 - DESC_JK;
+  if (sup === 'tb' && o.tbIcms) f = 1.11;
+  return {L, qtd, f, total:r2(qtd * L.preco * f)};
+}
+function sumSup(sup, o){
+  let s = 0, n = 0;
+  for (const oc of OC){
+    const lk = links[oc.n][sup];
+    if (lk){ s += calc(sup, lk.id, oc.qtd, o).total; n++; }
+  }
+  return {total:r2(s), n};
+}
+
+function supCell(sup, n, lk, c, best, diff){
+  const list = sup === 'jk' ? JK : TB;
+  const used = new Set(Object.entries(links).filter(([k,v]) => +k !== n && v[sup]).map(([k,v]) => v[sup].id));
+  const select = '<select class="relink" data-sup="'+sup+'" data-n="'+n+'" aria-label="Alterar vínculo '+SUPNAME[sup]+' do item '+n+'">'
+    + '<option value="">Alterar vínculo…</option><option value="none">Sem vínculo</option>'
+    + list.map(L => '<option value="'+L.id+'"'+(used.has(L.id)?' disabled':'')+'>'+L.cod+' · '+L.desc+(used.has(L.id)?' (em uso)':'')+'</option>').join('')
+    + '</select>';
+  if (!lk){
+    return '<div class="sup" data-label="'+SUPNAME[sup]+'"><div class="top"><span class="chip none">Não cotado</span></div>'
+      + '<div class="nocot">Este fornecedor não enviou preço para o item.</div>'+select+'</div>';
+  }
+  let tag = '';
+  if (best){
+    const warn = lk.st === 'verificar';
+    tag = '<span class="besttag'+(warn?' warn':'')+'">Menor preço · −'+brl(diff)+(warn?' · confirmar produto':'')+'</span>';
+  }
+  let adj = '';
+  if (sup === 'jk' && c.f !== 1) adj = ' · −7,2%';
+  if (sup === 'tb' && c.f !== 1) adj = ' · +11%';
+  return '<div class="sup'+(best?' best':'')+'" data-label="'+SUPNAME[sup]+'">'
+    + '<div class="top"><span class="chip '+lk.st+'">'+STLABEL[lk.st]+'</span>'+tag+'</div>'
+    + '<div class="desc"><span class="cod">'+c.L.cod+'</span> · '+c.L.desc+'</div>'
+    + '<div class="money"><strong>'+brl(c.total)+'</strong><span class="calc">'+c.qtd+' × '+brl(c.L.preco)+' ('+c.L.un+')'+adj+'</span></div>'
+    + (lk.nota ? '<div class="nota">'+lk.nota+'</div>' : '')
+    + select+'</div>';
+}
+
+function render(){
+  const o = getOpts();
+  let html = '';
+  lastRows = [];
+  let comJ = 0, comT = 0, comN = 0, okN = 0, verN = 0, manN = 0, onlyJ = 0, onlyT = 0;
+  for (const oc of OC){
+    const lk = links[oc.n];
+    const cj = lk.jk ? calc('jk', lk.jk.id, oc.qtd, o) : null;
+    const ct = lk.tb ? calc('tb', lk.tb.id, oc.qtd, o) : null;
+    let best = null, diff = 0;
+    if (cj && ct){
+      diff = r2(Math.abs(cj.total - ct.total));
+      best = cj.total < ct.total ? 'jk' : (ct.total < cj.total ? 'tb' : null);
+      comJ += cj.total; comT += ct.total; comN++;
+      if (lk.tb.st === 'ok') okN++; else if (lk.tb.st === 'manual') manN++; else verN++;
+    } else if (cj){ onlyJ++; } else if (ct){ onlyT++; }
+    lastRows.push({oc, lk, cj, ct, best});
+    html += '<div class="row"><div class="n">'+String(oc.n).padStart(2,'0')+'</div>'
+      + '<div class="item"><div class="oc-desc">'+oc.desc+'</div><div class="oc-qty">Qtd. na OC: '+oc.qtd+'</div></div>'
+      + supCell('jk', oc.n, lk.jk, cj, best === 'jk', diff)
+      + supCell('tb', oc.n, lk.tb, ct, best === 'tb', diff)
+      + '</div>';
+  }
+  $('rows').innerHTML = html;
+
+  const sj = sumSup('jk', o), st = sumSup('tb', o);
+  const desp = (o.tbDesp && st.n > 0) ? DESP_TB : 0;
+  const totJ = sj.total;
+  const totT = r2(st.total + desp);
+  const alt = r2(sumSup('tb', {...o, tbIcms:!o.tbIcms}).total + desp);
+  lastTotals = {totJ, totT, comJ:r2(comJ), comT:r2(comT), desp};
+
+  $('foot').innerHTML = '<div></div><div><div class="lab">Total do mapa</div></div>'
+    + '<div><div class="lab">J K · '+sj.n+' de '+OC.length+' itens</div><div class="v">'+brl(totJ)+'</div></div>'
+    + '<div><div class="lab">Tambasa · '+st.n+' de '+OC.length+' itens</div><div class="v">'+brl(totT)+'</div></div>';
+
+  const comTx = r2(comT + (comN > 0 ? desp : 0));
+  let cmp;
+  if (comN === 0){
+    cmp = '<div class="card hl"><div class="k">Comparação direta</div><div class="big">—</div><div class="sub">Nenhum item está vinculado aos dois fornecedores.</div></div>';
+  } else {
+    const d = r2(comJ - comTx);
+    const pct = comJ > 0 ? Math.abs(d / comJ * 100) : 0;
+    const who = d > 0 ? 'Tambasa' : (d < 0 ? 'J K' : 'Empate');
+    const parts = [];
+    if (okN) parts.push('<b>'+okN+'</b> conferem com a OC');
+    if (verN) parts.push('<b>'+verN+'</b> a confirmar');
+    if (manN) parts.push('<b>'+manN+'</b> vinculados por você');
+    cmp = '<div class="card hl"><div class="k">Nos '+comN+' itens cotados pelos dois</div>'
+      + '<div class="big">'+(d === 0 ? 'Empate' : who+' −'+brl(Math.abs(d)))+'</div>'
+      + '<div class="sub">'+(d === 0 ? '' : pct.toFixed(1).replace('.',',')+'% abaixo. ')+'J K '+brl(r2(comJ))+' · Tambasa '+brl(comTx)+(desp ? ' (com despesas)' : '')+'</div>'
+      + '<div class="sub">Tambasa: '+parts.join(' · ')+'.</div></div>';
+  }
+  $('summary').innerHTML =
+    '<div class="card"><div class="k">J K Materiais de Construções</div><div class="big">'+brl(totJ)+'</div>'
+    + '<div class="sub"><b>'+sj.n+' de '+OC.length+'</b> itens · frete R$ 0,00'+(o.jkDesc ? ' · com desconto da OC' : ' · preço de tabela')+'</div>'
+    + '<div class="sub">Cotação de 06/10 · retirada imediata · à vista · validade de 1 dia</div></div>'
+    + '<div class="card"><div class="k">Tambasa Atacadistas</div><div class="big">'+brl(totT)+'</div>'
+    + '<div class="sub"><b>'+st.n+' de '+OC.length+'</b> itens'+(desp ? ' · com despesas acessórias de R$ 8,99' : ' · sem despesas acessórias')+'</div>'
+    + '<div class="sub">'+(o.tbIcms ? 'Sem o acréscimo de 11%: ' : 'Com acréscimo de 11% (não contribuinte): ')+'<b>'+brl(alt)+'</b></div>'
+    + '<div class="sub">Orçamento de 29/09 · sujeito a confirmação de preço, prazo e estoque</div></div>'
+    + cmp;
+
+  renderExtras();
+}
+
+function renderExtras(){
+  const usedJ = new Set(), usedT = new Set();
+  for (const oc of OC){ const l = links[oc.n]; if (l.jk) usedJ.add(l.jk.id); if (l.tb) usedT.add(l.tb.id); }
+  const out = [];
+  JK.filter(x => !usedJ.has(x.id)).forEach(x => out.push(['J K Materiais', x]));
+  TB.filter(x => !usedT.has(x.id)).forEach(x => out.push(['Tambasa', x]));
+  if (!out.length){ $('extras').innerHTML = '<div class="empty">Todas as linhas cotadas estão vinculadas a um item da OC.</div>'; return; }
+  $('extras').innerHTML = '<table><thead><tr><th>Fornecedor</th><th>Código</th><th>Descrição cotada</th><th>Cotação</th></tr></thead><tbody>'
+    + out.map(([s,x]) => '<tr><td>'+s+'</td><td class="mono">'+x.cod+'</td><td>'+x.desc+'</td><td class="mono">'
+      + (x.info || (x.qtdCot+' '+x.un+' cotado(s) · '+brl(x.preco)+' a unidade'))+'</td></tr>').join('')
+    + '</tbody></table>';
+}
+
+function buildTsv(){
+  const head = ['Item','Descrição da OC','Qtd. OC','JK código','JK descrição','JK total','Tambasa código','Tambasa descrição','Tambasa total','Menor preço'];
+  const lines = [head.join('\t')];
+  for (const r of lastRows){
+    lines.push([
+      r.oc.n, r.oc.desc, r.oc.qtd,
+      r.cj ? r.cj.L.cod : '', r.cj ? r.cj.L.desc : '', r.cj ? num(r.cj.total) : '',
+      r.ct ? r.ct.L.cod : '', r.ct ? r.ct.L.desc : '', r.ct ? num(r.ct.total) : '',
+      r.best ? SUPNAME[r.best] : ''
+    ].join('\t'));
+  }
+  lines.push(['','Total (J K sem frete; Tambasa com despesas, se marcadas)','',  '','',num(lastTotals.totJ),'','',num(lastTotals.totT),''].join('\t'));
+  return lines.join('\n');
+}
+
+$('rows').addEventListener('change', e => {
+  const s = e.target.closest('select.relink');
+  if (!s || !s.value && s.value !== '') return;
+  const n = +s.dataset.n, sup = s.dataset.sup;
+  if (s.value === '') return;
+  links[n][sup] = s.value === 'none' ? null : {id:s.value, st:'manual', nota:''};
+  render();
+});
+['optJkDesc','optTbIcms','optTbDesp'].forEach(id => $(id).addEventListener('change', render));
+$('reset').addEventListener('click', () => { links = clone(DEFAULTS); $('msg').textContent = 'Vínculos restaurados.'; render(); });
+$('copy').addEventListener('click', async () => {
+  const t = buildTsv();
+  try {
+    await navigator.clipboard.writeText(t);
+    $('tsv').hidden = true;
+    $('msg').textContent = 'Copiado. Cole no Excel ou no Google Planilhas.';
+  } catch (err) {
+    const ta = $('tsv'); ta.hidden = false; ta.value = t; ta.focus(); ta.select();
+    $('msg').textContent = 'Selecionado. Use Ctrl+C para copiar.';
+  }
+});
+render();
+</script>

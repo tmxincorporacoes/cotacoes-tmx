@@ -134,7 +134,7 @@ td input.n{width:90px;text-align:right}
 <div id="modal"><div class="caixa" id="caixa"></div></div>
 <div id="lateral"></div>
 <div id="aviso" role="status"></div>
-<input type="file" id="arqOC" accept="application/pdf" hidden>
+<input type="file" id="arqOC" accept="application/pdf,.pdf,.xlsx,.xls,.csv" hidden>
 <input type="file" id="arqCot" accept="application/pdf,.pdf,.xlsx,.xls,.csv" hidden>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -227,7 +227,7 @@ function htmlOCs() {
     return '<tr class="clicavel" data-acao="abrir-oc" data-v="' + esc(o.id) + '"><td class="mono">' + esc(o.numero) + '</td><td>' + esc(o.obra) + '</td><td>' + dataBR(o.data) + '</td><td>' + o.itens.length + '</td><td>' + nc + '</td><td>' + esc(o.status) + '</td></tr>';
   }).join('');
   return '<div class="linha"><div><h2>Ordens de compra</h2><div class="sub">Importe o PDF da OC do Obra Prima ou cole os itens. Depois adicione as cotações dos fornecedores.</div></div>'
-    + '<div class="espaco linha"><button class="btn" data-acao="oc-manual">Nova OC (colar itens)</button><button class="btn prim" data-acao="oc-importar">Importar PDF da OC</button></div></div>'
+    + '<div class="espaco linha"><button class="btn" data-acao="oc-manual">Nova OC (colar itens)</button><button class="btn prim" data-acao="oc-importar">Importar OC (PDF ou Excel)</button></div></div>'
     + (S.ocs.length ? '<div class="rolagem"><table><thead><tr><th>Nº</th><th>Obra</th><th>Data</th><th>Itens</th><th>Cotações</th><th>Status</th></tr></thead><tbody>' + linhas + '</tbody></table></div>'
       : '<div class="vazio">Nenhuma OC ainda. Comece importando o PDF da OC.</div>');
 }
@@ -430,6 +430,7 @@ async function lerPdf(file) {
 }
 async function importarOC(file) {
   try {
+    if (/\.(xlsx|xls|csv)$/i.test(file.name)) return await importarOCPlanilha(file);
     aviso('Lendo o PDF…');
     const d = Leitor.ler(await lerPdf(file));
     if (!d) return abrirModal('<h2>Formato não reconhecido</h2><p>Este PDF não parece ser a ordem de compra do Obra Prima. Use "Nova OC (colar itens)" para digitar ou colar os itens.</p><div class="linha"><button class="btn" data-acao="fechar-modal">Fechar</button></div>');
@@ -442,6 +443,60 @@ async function importarOC(file) {
       + (existe ? '<div class="sub"><b>A OC ' + esc(d.numero) + ' já existe.</b> Salvar vai substituir os itens (as cotações ficam, mas os vínculos podem perder o sentido).</div>' : '')
       + '<div class="linha"><button class="btn prim" data-acao="oc-salvar-importada">' + (existe ? 'Substituir OC' : 'Salvar OC') + '</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
   } catch (e) { aviso('Erro ao ler o PDF: ' + e.message); }
+}
+
+/* ---------- OC em Excel ou CSV ---------- */
+async function importarOCPlanilha(file) {
+  aviso('Lendo a planilha…');
+  const rows = await LeitorPlanilha.lerArquivo(file, { semPreco: true });
+  if (!rows.length) throw new Error('O arquivo está vazio.');
+  ui.rascunho = { tipo: 'oc', origem: 'planilha', rows, nome: file.name, d: null };
+  try { ui.rascunho.d = LeitorPlanilha.extrairOC(rows); }
+  catch (e) { if (e.codigo === 'sem_cabecalho') return modalMapeamentoOC(rows); throw e; }
+  modalPreviaOCPlanilha();
+}
+function modalPreviaOCPlanilha() {
+  const d = ui.rascunho.d, nomeBase = String(ui.rascunho.nome || '').replace(/\.[^.]+$/, '');
+  const sugerido = d.numero || ((nomeBase.match(/\d{3,}/) || [''])[0]);
+  const semCod = d.itens.filter(i => !i.material_id).length;
+  abrirModal('<h2>OC lida da planilha</h2><div class="sub">Colunas lidas: ' + d.colunas_lidas.map(esc).join(' · ') + '</div>'
+    + '<div class="campos"><label>Número da OC *<input type="text" id="mOCNum" value="' + esc(sugerido) + '"></label><label>Obra<input type="text" id="mOCObra" value="' + esc(d.obra) + '"></label><label>Data (dd/mm/aaaa)<input type="text" id="mOCData" value="' + esc(d.data_emissao ? dataBR(d.data_emissao) : dataBR(hoje())) + '"></label></div>'
+    + tabelaPrevia(d.itens, 'oc')
+    + '<div class="sub">' + d.itens.length + ' itens' + (d.total_documento !== null ? ' · total ' + brl(d.total_documento) : '') + '</div>'
+    + (semCod ? '<ul class="alertas"><li class="aviso"><b>Atenção</b><span>' + semCod + ' item(ns) sem código do Obra Prima. Preencha depois na aba Itens da OC para o sistema aprender.</span></li></ul>' : '')
+    + '<div class="linha"><button class="btn prim" data-acao="oc-salvar-planilha">Salvar OC</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+async function salvarOCPlanilha() {
+  const d = ui.rascunho.d, numero = $('mOCNum').value.trim();
+  if (!numero) return aviso('Informe o número da OC.');
+  const existe = S.ocs.find(o => o.numero === numero);
+  if (existe && !confirm('A OC ' + numero + ' já existe. Substituir os itens dela? As cotações ficam, mas os vínculos podem perder o sentido.')) return;
+  const { id } = await Banco.salvarOC({
+    oc: { id: existe && existe.id, numero, obra: $('mOCObra').value.trim(), data: Leitor.dataISO($('mOCData').value) || hoje(), status: 'aberta', cond_pgto: d.cond_pgto || '', previsao_entrega: d.previsao_entrega || '', fornecedor: d.fornecedor || '', subtotal: d.subtotal === null ? '' : d.subtotal, desconto_total: '', total_documento: d.total_documento === null ? '' : d.total_documento },
+    itens: d.itens.map(i => ({ n: i.n, preco_unit: i.preco_unit === null ? '' : i.preco_unit, desconto_valor: '', material_id: i.material_id || (existe && (existe.itens.find(x => x.n === i.n) || {}).material_id) || '', descricao: i.descricao, qtd: i.qtd, unidade: i.un }))
+  });
+  fecharModal(); ui.ocId = id; ui.tela = 'oc'; ui.aba = 'itens'; await recarregar(); render();
+  aviso('OC salva com ' + d.itens.length + ' itens. Confira o código do insumo no Obra Prima de cada item.');
+}
+function modalMapeamentoOC(rows) {
+  const amostra = rows.slice(0, 12), n = Math.max(1, ...amostra.map(l => l.length));
+  const opcoes = '<option value="">— não tem —</option>' + Array.from({ length: n }, (_, i) => '<option value="' + i + '">Coluna ' + letraCol(i) + '</option>').join('');
+  const papeis = [['descricao', 'Descrição do item *'], ['qtd', 'Quantidade *'], ['un', 'Unidade'], ['codigo_tmx', 'Código do insumo (Obra Prima)'], ['preco_unit', 'Preço unitário']];
+  abrirModal('<h2>Não reconheci as colunas desta planilha</h2><div class="sub">Diga em qual coluna está cada informação. Os campos com * são obrigatórios.</div>'
+    + '<div class="rolagem" style="max-height:34vh"><table><thead><tr><th>Linha</th>' + Array.from({ length: n }, (_, i) => '<th>' + letraCol(i) + '</th>').join('') + '</tr></thead><tbody>'
+    + amostra.map((l, k) => '<tr><td class="mono">' + (k + 1) + '</td>' + Array.from({ length: n }, (_, i) => '<td>' + esc(l[i] instanceof Date ? dataBR(LeitorPlanilha.dataISO(l[i])) : l[i]) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>'
+    + '<div class="campos"><label>Número da linha do cabeçalho<input type="text" id="mLinhaCab" value="1"></label>'
+    + papeis.map(([k, t]) => '<label>' + t + '<select id="mCol_' + k + '">' + opcoes + '</select></label>').join('') + '</div>'
+    + '<div class="linha"><button class="btn prim" data-acao="usar-mapeamento-oc">Usar este mapeamento</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+function usarMapeamentoOC() {
+  const colunas = {};
+  ['descricao', 'qtd', 'un', 'codigo_tmx', 'preco_unit'].forEach(k => { const v = $('mCol_' + k).value; if (v !== '') colunas[k] = Number(v); });
+  if (colunas.descricao === undefined || colunas.qtd === undefined) return aviso('Escolha as colunas de descrição e quantidade.');
+  const linhaCab = Number($('mLinhaCab').value) - 1;
+  if (!Number.isInteger(linhaCab) || linhaCab < 0) return aviso('Informe o número da linha do cabeçalho (1 é a primeira).');
+  try { ui.rascunho.d = LeitorPlanilha.extrairOC(ui.rascunho.rows, { linhaCab, colunas }); modalPreviaOCPlanilha(); }
+  catch (e) { aviso(e.message); }
 }
 async function salvarOCImportada() {
   const d = ui.rascunho.d, existe = S.ocs.find(o => o.numero === d.numero);
@@ -712,6 +767,8 @@ document.addEventListener('click', async e => {
     else if (a === 'copiar-prompt') { try { await navigator.clipboard.writeText(Leitor.montarPromptExtracao()); aviso('Instrução copiada.'); } catch (x) { $('mJson').value = Leitor.montarPromptExtracao(); aviso('Copie o texto que apareceu na caixa e depois apague.'); } }
     else if (a === 'usar-json') usarJSON();
     else if (a === 'usar-mapeamento') usarMapeamento();
+    else if (a === 'usar-mapeamento-oc') usarMapeamentoOC();
+    else if (a === 'oc-salvar-planilha') await salvarOCPlanilha();
     else if (a === 'cot-salvar') await salvarCotacao();
     else if (a === 'fechar-modal') fecharModal();
     else if (a === 'ver-pdf') { ui.pdfAberto = id; renderLateral(); }

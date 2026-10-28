@@ -183,7 +183,9 @@
       // Embalagem fechada: o líquido é o preço da embalagem e o unit. o preço da peça.
       let fator = 1, emb = null;
       if (Math.abs(liq - unit) > 0.005 && unit > 0) {
-        fator = r2(liq / unit);
+        const razao = liq / unit, dica = /\bC(\d{1,3})\b/.exec(curta), cand = dica ? Number(dica[1]) : Math.round(razao);
+        // o unit. impresso é arredondado em centavos (0,77 × 50 ≠ 38,29), então a razão sai imprecisa (49,73); a caixa "C50" tem 50
+        fator = (cand >= 2 && Math.abs(razao - cand) / cand <= 0.02) ? cand : r2(razao);
         emb = 'embalagem com ' + fator + ' (líquido ' + liq.toFixed(2).replace('.', ',') + ' / unit. ' + unit.toFixed(2).replace('.', ',') + ')';
       } else if (un === 'PR') { fator = 2; emb = 'par (2 peças)'; }
       return {

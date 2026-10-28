@@ -271,7 +271,17 @@
     return primeira || [];
   }
 
-  const api = { num, dataISO, parseCSV, detectarCabecalho, extrair, extrairOC, lerArquivo, ROTULOS };
+
+  /** Todas as abas do arquivo: [{ nome, rows }]. CSV tem uma só (o nome do arquivo). */
+  async function lerAbas(file) {
+    const buf = await file.arrayBuffer();
+    if (/\.csv$|\.txt$/i.test(file.name)) return [{ nome: file.name.replace(/\.[^.]+$/, ''), rows: parseCSV(textoDe(buf)) }];
+    if (!raiz.XLSX) throw new Error('A biblioteca de planilhas não carregou. Confira a conexão com a internet.');
+    const wb = raiz.XLSX.read(buf, { type: 'array', cellDates: true });
+    return wb.SheetNames.map(nome => ({ nome, rows: raiz.XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, raw: true, defval: '' }) }));
+  }
+
+  const api = { num, dataISO, parseCSV, detectarCabecalho, extrair, extrairOC, lerArquivo, lerAbas, ROTULOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.LeitorPlanilha = api;
 })(typeof window !== 'undefined' ? window : this);

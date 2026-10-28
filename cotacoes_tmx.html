@@ -448,12 +448,69 @@ async function importarOC(file) {
 /* ---------- OC em Excel ou CSV ---------- */
 async function importarOCPlanilha(file) {
   aviso('Lendo a planilha…');
-  const rows = await LeitorPlanilha.lerArquivo(file, { semPreco: true });
-  if (!rows.length) throw new Error('O arquivo está vazio.');
-  ui.rascunho = { tipo: 'oc', origem: 'planilha', rows, nome: file.name, d: null };
-  try { ui.rascunho.d = LeitorPlanilha.extrairOC(rows); }
-  catch (e) { if (e.codigo === 'sem_cabecalho') return modalMapeamentoOC(rows); throw e; }
-  modalPreviaOCPlanilha();
+  const abas = await LeitorPlanilha.lerAbas(file);
+  if (!abas.some(a => a.rows.length)) throw new Error('O arquivo está vazio.');
+  const cand = []; let erroItens = null;
+  abas.forEach(a => {
+    try { cand.push({ a, d: LeitorPlanilha.extrairOC(a.rows) }); }
+    catch (e) { if (e.codigo === 'sem_itens') erroItens = e; else if (e.codigo !== 'sem_cabecalho') throw e; }
+  });
+  ui.rascunho = { tipo: 'oc', origem: 'planilha', nome: file.name, d: null, abas: cand };
+  if (!cand.length) {
+    if (erroItens) throw erroItens;
+    const rows = abas.find(a => a.rows.length).rows; ui.rascunho.rows = rows; return modalMapeamentoOC(rows);
+  }
+  if (cand.length === 1) { ui.rascunho.d = cand[0].d; ui.rascunho.rows = cand[0].a.rows; return modalPreviaOCPlanilha(); }
+  modalEscolherAbas();
+}
+function modalEscolherAbas() {
+  const cand = ui.rascunho.abas;
+  abrirModal('<h2>Esta planilha tem ' + cand.length + ' abas com itens</h2><div class="sub">Marque as abas que quer importar.</div>'
+    + '<div class="rolagem"><table><thead><tr><th></th><th>Aba</th><th>Itens</th></tr></thead><tbody>'
+    + cand.map((c, i) => '<tr><td><input type="checkbox" id="mAba_' + i + '" checked></td><td>' + esc(c.a.nome) + '</td><td class="mono">' + c.d.itens.length + '</td></tr>').join('') + '</tbody></table></div>'
+    + '<label class="sub"><input type="radio" name="mModoAbas" value="separadas" checked> <b>Uma OC para cada aba</b>: cada aba vira uma ordem de compra, com o nome da aba como obra.</label>'
+    + '<label class="sub"><input type="radio" name="mModoAbas" value="juntar"> <b>Juntar tudo em uma só OC</b>: os itens das abas marcadas ficam na mesma lista.</label>'
+    + '<div class="linha"><button class="btn prim" data-acao="abas-continuar">Continuar</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+function abasContinuar() {
+  const cand = ui.rascunho.abas, esc_ = cand.map((c, i) => ({ c, i })).filter(x => $('mAba_' + x.i).checked);
+  if (!esc_.length) return aviso('Marque pelo menos uma aba.');
+  const modo = (document.querySelector('input[name="mModoAbas"]:checked') || {}).value;
+  ui.rascunho.escolhidas = esc_.map(x => x.c);
+  if (modo === 'juntar') {
+    const itens = []; esc_.forEach(x => x.c.d.itens.forEach(i => itens.push(Object.assign({}, i, { n: itens.length + 1 }))));
+    const primeira = esc_[0].c.d, tem = itens.some(i => i.preco_unit !== null);
+    ui.rascunho.d = Object.assign({}, primeira, { itens, subtotal: tem ? 0 : null, total_documento: tem ? 0 : null, obra: primeira.obra });
+    ui.rascunho.d.total_documento = tem ? Math.round(itens.reduce((s, i) => s + (i.total || 0), 0) * 100) / 100 : null;
+    return modalPreviaOCPlanilha();
+  }
+  modalOCsSeparadas();
+}
+function modalOCsSeparadas() {
+  const cs = ui.rascunho.escolhidas;
+  abrirModal('<h2>' + cs.length + ' ordens de compra</h2><div class="sub">Informe o número de cada OC. O nome da aba já vem como obra, e você pode mudar.</div>'
+    + '<div class="rolagem"><table><thead><tr><th>Aba</th><th>Itens</th><th>Número da OC *</th><th>Obra</th></tr></thead><tbody>'
+    + cs.map((c, i) => '<tr><td>' + esc(c.a.nome) + '</td><td class="mono">' + c.d.itens.length + '</td><td><input type="text" id="mNumV_' + i + '" value="' + esc(c.d.numero) + '"></td><td><input type="text" id="mObraV_' + i + '" value="' + esc(c.d.obra || c.a.nome) + '"></td></tr>').join('') + '</tbody></table></div>'
+    + '<div class="campos"><label>Data (dd/mm/aaaa)<input type="text" id="mDataV" value="' + esc(dataBR(hoje())) + '"></label></div>'
+    + '<div class="sub">Os itens ficam sem código do Obra Prima; preencha depois na aba Itens da OC de cada uma.</div>'
+    + '<div class="linha"><button class="btn prim" data-acao="oc-salvar-varias">Salvar ' + cs.length + ' OCs</button><button class="btn" data-acao="fechar-modal">Cancelar</button></div>');
+}
+async function salvarVariasOCs() {
+  const cs = ui.rascunho.escolhidas, nums = cs.map((c, i) => $('mNumV_' + i).value.trim());
+  if (nums.some(n => !n)) return aviso('Informe o número de todas as OCs.');
+  if (new Set(nums).size !== nums.length) return aviso('Os números das OCs não podem se repetir.');
+  const dup = nums.filter(n => S.ocs.some(o => o.numero === n));
+  if (dup.length && !confirm('Já existe OC com o número ' + dup.join(', ') + '. Substituir os itens dela(s)? As cotações ficam, mas os vínculos podem perder o sentido.')) return;
+  const data = Leitor.dataISO($('mDataV').value) || hoje();
+  for (let i = 0; i < cs.length; i++) {
+    const d = cs[i].d, existe = S.ocs.find(o => o.numero === nums[i]);
+    await Banco.salvarOC({
+      oc: { id: existe && existe.id, numero: nums[i], obra: $('mObraV_' + i).value.trim(), data, status: 'aberta', cond_pgto: '', previsao_entrega: '', fornecedor: '', subtotal: '', desconto_total: '', total_documento: '' },
+      itens: d.itens.map(it => ({ n: it.n, preco_unit: it.preco_unit === null ? '' : it.preco_unit, desconto_valor: '', material_id: it.material_id || '', descricao: it.descricao, qtd: it.qtd, unidade: it.un }))
+    });
+  }
+  fecharModal(); ui.tela = 'ocs'; ui.ocId = null; await recarregar(); render();
+  aviso(cs.length + ' OCs salvas. Abra cada uma para conferir os itens e preencher o código do Obra Prima.');
 }
 function modalPreviaOCPlanilha() {
   const d = ui.rascunho.d, nomeBase = String(ui.rascunho.nome || '').replace(/\.[^.]+$/, '');
@@ -769,6 +826,8 @@ document.addEventListener('click', async e => {
     else if (a === 'usar-mapeamento') usarMapeamento();
     else if (a === 'usar-mapeamento-oc') usarMapeamentoOC();
     else if (a === 'oc-salvar-planilha') await salvarOCPlanilha();
+    else if (a === 'abas-continuar') abasContinuar();
+    else if (a === 'oc-salvar-varias') await salvarVariasOCs();
     else if (a === 'cot-salvar') await salvarCotacao();
     else if (a === 'fechar-modal') fecharModal();
     else if (a === 'ver-pdf') { ui.pdfAberto = id; renderLateral(); }

@@ -93,7 +93,8 @@
   }
 
   /** Acha a linha de cabeçalho e as colunas. Devolve null se não achar descrição, quantidade e preço. */
-  function detectarCabecalho(rows) {
+  function detectarCabecalho(rows, opt) {
+    const semPreco = !!(opt && opt.semPreco);
     let melhor = null;
     rows.slice(0, 60).forEach((linha, i) => {
       const achados = {};
@@ -104,7 +105,7 @@
         if (!atual || (atual.nivel === 'fraco' && p.nivel === 'forte')) achados[p.papel] = { col: c, nivel: p.nivel };
       });
       const tem = k => achados[k] !== undefined;
-      if (!((tem('descricao') || tem('descricao_pedida') || tem('descricao_cotada')) && tem('qtd') && tem('preco_unit'))) return;
+      if (!((tem('descricao') || tem('descricao_pedida') || tem('descricao_cotada')) && tem('qtd') && (semPreco || tem('preco_unit')))) return;
       const score = Object.keys(achados).length;
       if (!melhor || score > melhor.score) melhor = { score, linhaCab: i, colunas: Object.keys(achados).reduce((o, k) => { o[k] = achados[k].col; return o; }, {}) };
     });
@@ -122,7 +123,8 @@
     ['emissao', /^(data( da cota[cç][aã]o| de emiss[aã]o)?|emiss[aã]o)\b/i],
     ['obs', /^(observa[cç][oõ]es?|obs\.?)\b/i],
     ['entrega', /^(prazo de entrega|previs[aã]o de entrega|entrega)\b/i],
-    ['oc_numero', /^ordem de compra\b/i],
+    ['oc_numero', /^(ordem de compra|oc\b|n[º°o.]*\s*(da )?oc\b|numero da oc|pedido de compra)/i],
+    ['obra', /^(obra|centro de custo|obra\/centro de custo)\b/i],
     ['total', /^(total geral|valor total( geral)?|total da cota[cç][aã]o)\b/i]
   ];
 
@@ -202,6 +204,52 @@
     };
   }
 
+
+  // ------------------------------------------------------------ ordem de compra em Excel/CSV
+
+  /**
+   * Lê uma OC (itens a comprar) de uma planilha. Só descrição e quantidade são obrigatórias;
+   * unidade, código do insumo e preço são lidos se existirem. Devolve o mesmo formato do leitor
+   * de PDF da OC (tipo 'oc'), com material_id por item. Se não achar as colunas, falha com
+   * err.codigo === 'sem_cabecalho' (a tela abre o mapeamento manual).
+   */
+  function extrairOC(rows, opcoes) {
+    rows = rows.map(l => l.map(c => (c === null || c === undefined ? '' : c)));
+    const cab = opcoes && opcoes.colunas ? { linhaCab: opcoes.linhaCab, colunas: opcoes.colunas } : detectarCabecalho(rows, { semPreco: true });
+    const col = cab && cab.colunas;
+    const temDesc = col && (col.descricao !== undefined || col.descricao_pedida !== undefined || col.descricao_cotada !== undefined);
+    if (!cab || !temDesc || col.qtd === undefined) {
+      const e = new Error('Não encontrei as colunas de descrição e quantidade nesta planilha.');
+      e.codigo = 'sem_cabecalho'; e.rows = rows; throw e;
+    }
+    const meta = {};
+    const lerMeta = linha => linha.forEach((cel, c) => { if (typeof cel === 'string') ROT_META.forEach(([k, re]) => { if (meta[k] === undefined && re.test(cel.trim())) meta[k] = valorDoRotulo(linha, c); }); });
+    const txt = (linha, c) => (c === undefined ? '' : String(linha[c]).trim());
+    const itens = [];
+    rows.forEach((linha, i) => {
+      if (i <= cab.linhaCab) { lerMeta(linha); return; }
+      const desc = txt(linha, col.descricao_pedida !== undefined ? col.descricao_pedida : col.descricao) || txt(linha, col.descricao_cotada);
+      const q = num(linha[col.qtd]);
+      if (desc && q !== null && q > 0 && !/^total\b/i.test(desc)) {
+        const p = col.preco_unit !== undefined ? num(linha[col.preco_unit]) : null;
+        const cod = col.codigo_tmx !== undefined ? txt(linha, col.codigo_tmx) : (col.codigo !== undefined ? txt(linha, col.codigo) : '');
+        itens.push({ n: itens.length + 1, material_id: cod, descricao: desc, qtd: q, un: (txt(linha, col.un) || 'UN'), preco_unit: p, subtotal: p !== null ? r2(q * p) : null, desconto_valor: null, total: p !== null ? r2(q * p) : null });
+      } else lerMeta(linha);
+    });
+    if (!itens.length) { const e = new Error('A tabela foi encontrada, mas nenhuma linha tem descrição e quantidade válidas.'); e.codigo = 'sem_itens'; throw e; }
+    const emissao = meta.emissao != null ? dataISO(meta.emissao) : null;
+    const soma = r2(itens.reduce((s, i) => s + (i.total || 0), 0));
+    return {
+      tipo: 'oc', origem: 'planilha',
+      numero: meta.oc_numero != null ? String(meta.oc_numero).trim() : '', obra: meta.obra != null ? String(meta.obra).trim() : '',
+      data_emissao: emissao, fornecedor: meta.fornecedor != null ? String(meta.fornecedor).trim() : null,
+      cond_pgto: meta.pagamento != null ? String(meta.pagamento).trim() : null, previsao_entrega: meta.entrega != null ? String(meta.entrega).trim() : null,
+      subtotal: col.preco_unit !== undefined ? soma : null, desconto_total: null, total_documento: col.preco_unit !== undefined ? soma : null, frete: null,
+      colunas_lidas: Object.keys(col).filter(k => ROTULOS[k]).map(k => ROTULOS[k] + ' ← "' + String(rows[cab.linhaCab][col[k]]).trim() + '"'),
+      itens
+    };
+  }
+
   // ------------------------------------------------------------ arquivo
 
   function textoDe(buf) {
@@ -209,7 +257,7 @@
   }
 
   /** Lê o arquivo escolhido e devolve a matriz de linhas (a primeira aba que tiver a tabela, no Excel). */
-  async function lerArquivo(file) {
+  async function lerArquivo(file, opt) {
     const buf = await file.arrayBuffer();
     if (/\.csv$|\.txt$/i.test(file.name)) return parseCSV(textoDe(buf));
     if (!raiz.XLSX) throw new Error('A biblioteca de planilhas não carregou. Confira a conexão com a internet.');
@@ -218,12 +266,12 @@
     for (const nome of wb.SheetNames) {
       const rows = raiz.XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, raw: true, defval: '' });
       if (!primeira && rows.length) primeira = rows;
-      if (detectarCabecalho(rows)) return rows;
+      if (detectarCabecalho(rows, opt)) return rows;
     }
     return primeira || [];
   }
 
-  const api = { num, dataISO, parseCSV, detectarCabecalho, extrair, lerArquivo, ROTULOS };
+  const api = { num, dataISO, parseCSV, detectarCabecalho, extrair, extrairOC, lerArquivo, ROTULOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.LeitorPlanilha = api;
 })(typeof window !== 'undefined' ? window : this);

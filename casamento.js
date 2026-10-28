@@ -19,9 +19,12 @@
   const ABREV = {
     valv: 'valvula', sanf: 'sanfonado', bco: 'branco', lav: 'lavatorio', amer: 'americana', americano: 'americana',
     adap: 'adaptador', cx: 'caixa', sanit: 'sanitario', univ: 'universal', crom: 'cromado', cr: 'cromado',
-    met: 'metal', lad: 'ladrao', s: 'sem', acab: 'acabamento', reg: 'registro', ass: 'assento'
+    met: 'metal', lad: 'ladrao', s: 'sem', acab: 'acabamento', reg: 'registro', ass: 'assento', tee: 'te'
   };
   const FRASES = [[/pia de banheiro/g, 'lavatorio']];
+  // Palavra da OC que o fornecedor não escreve, mas que a cotação já diz por outro meio
+  // (a JK chama de "ANEL BORRACHA" o que a OC chama de "anel de vedação").
+  const IMPLICITOS = { vedacao: ['borracha'] };
   const PARADAS = new Set(['de', 'da', 'do', 'das', 'dos', 'para', 'a', 'o', 'e', 'em', 'com', 'c', 'un', 'und', 'unid', 'unidade', 'unidades', 'pc', 'pcs', 'peca', 'pecas']);
 
   // marca → forma canônica; inclui grafias truncadas que aparecem nos PDFs ("GHELPLU.", "BLUKT")
@@ -64,6 +67,15 @@
     let s = semAcento(String(desc || '').toLowerCase());
     s = s.replace(/cod\.?\s*ncm:?\s*\d+/g, ' ').replace(/cod\.?\s*barras:?[\d\s]*/g, ' ').replace(/marca:?/g, ' ');
     s = s.replace(/\bc\/\s*0*\d+\s*un\b/g, ' ').replace(/\b\d{7,}\b/g, ' ');
+    // medida composta "100x100mm" / "45x100mm": separa os números (a unidade fica no último), igual em qualquer escrita;
+    // se um dos lados tem 1 dígito (placa 4x2, disjuntor 1x16A) mantém junto, para não perder a diferença
+    s = s.replace(/×/g, 'x').replace(/(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)/g, (m, a, b) => (a.replace(/\D/g, '').length >= 2 && b.replace(/\D/g, '').length >= 2) ? a + ' ' + b : a + 'x' + b);
+    // peso e volume por embalagem (pasta 160 g × 300 g)
+    const pesos = new Set(), pesosTxt = [];
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b/g, (m, n, u) => {
+      const v = Number(n.replace(',', '.')) * (u === 'kg' || u === 'l' ? 1000 : 1);
+      pesos.add(String(Math.round(v)) + (u === 'ml' || u === 'l' ? 'ml' : 'g')); pesosTxt.push(n + ' ' + u); return ' ';
+    });
     const med = extrairMedidas(s);
     s = med.texto;
     FRASES.forEach(([re, por]) => { s = s.replace(re, ' ' + por + ' '); });
@@ -75,13 +87,13 @@
       else if (MATERIAIS[t]) materiais.add(MATERIAIS[t]);
       else conteudo.add(t);
     });
-    return { conteudo, marcas, materiais, medidas: med.canon, medidasTxt: med.exibir };
+    return { conteudo, marcas, materiais, medidas: med.canon, medidasTxt: med.exibir, pesos, pesosTxt };
   }
 
   /** Descrição normalizada, usada como chave do dicionário. */
   function normalizar(desc) {
     const a = analisar(desc);
-    return [].concat([...a.conteudo], [...a.marcas], [...a.materiais], [...a.medidas]).sort().join(' ');
+    return [].concat([...a.conteudo], [...a.marcas], [...a.materiais], [...a.medidas], [...a.pesos]).sort().join(' ');
   }
 
   const inter = (a, b) => [...a].filter(x => b.has(x));
@@ -90,11 +102,14 @@
   /** Compara a descrição de um item da OC com a de uma linha cotada. */
   function comparar(descOC, descCot) {
     const o = analisar(descOC), c = analisar(descCot);
-    const comuns = inter(o.conteudo, c.conteudo);
-    const faltando = [...o.conteudo].filter(t => !c.conteudo.has(t));
-    const total = o.conteudo.size + c.conteudo.size;
+    const implicito = t => !c.conteudo.has(t) && (IMPLICITOS[t] || []).some(m => c.materiais.has(MATERIAIS[m] || m));
+    const cobertos = [...o.conteudo].filter(t => c.conteudo.has(t) || implicito(t));
+    const comuns = cobertos, nImplicitos = cobertos.filter(implicito).length;
+    const faltando = [...o.conteudo].filter(t => !c.conteudo.has(t) && !implicito(t));
+    const total = o.conteudo.size + c.conteudo.size + nImplicitos;
     const conflitos = [];
     if (disjuntos(o.medidas, c.medidas)) conflitos.push('Bitola: OC ' + o.medidasTxt.join(' / ') + ' × cotação ' + c.medidasTxt.join(' / '));
+    if (disjuntos(o.pesos, c.pesos)) conflitos.push('Quantidade na embalagem: OC ' + o.pesosTxt.join(' / ') + ' × cotação ' + c.pesosTxt.join(' / '));
     if (disjuntos(o.materiais, c.materiais)) conflitos.push('Material: OC ' + [...o.materiais].join('/') + ' × cotação ' + [...c.materiais].join('/'));
     if (disjuntos(o.marcas, c.marcas)) conflitos.push('Marca: OC ' + [...o.marcas].join('/') + ' × cotação ' + [...c.marcas].join('/'));
     const marcaFalta = [...o.marcas].filter(m => !c.marcas.has(m));

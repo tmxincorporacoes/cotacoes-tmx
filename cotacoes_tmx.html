@@ -193,7 +193,7 @@ const ocAtual = () => S.ocs.find(o => o.id === ui.ocId);
 const nomeForn = id => (S.fornecedores.find(f => f.id === id) || { nome: '(fornecedor removido)' }).nome;
 
 /* ============================== cálculo ============================== */
-const { linhaDe, custo, totalCot } = window.Calculo;
+const { linhaDe, caixas, custo, totalCot } = window.Calculo;
 const mencionaICMS = cot => (cot.observacoes || []).some(o => /ICMS/i.test(o));
 const ICMS_OPCOES = [['', 'Escolher cenário…'], ['0', 'Contribuinte do ICMS (sem acréscimo)'], ['10', 'Não contribuinte · GO (+10%)'], ['11', 'Não contribuinte · Sul/Sudeste (+11%)'], ['16.5', 'Não contribuinte · BA (+16,5%)'], ['20', 'Não contribuinte · ES, MS, PB, MA, GO e demais (+20%)'], ['22', 'Não contribuinte · SE e PI (+22%)']];
 function descontoSugeridoOC(cot, oc) {
@@ -271,7 +271,9 @@ function htmlCards(oc, cots, tot) {
   const cards = cots.map((c, k) => {
     const t = tot[k], hoje_ = hoje();
     const vencida = c.validade_ate && c.validade_ate < hoje_;
-    const val = c.validade ? '<span class="chip ' + (vencida ? 'erro' : 'confere') + '">' + (vencida ? 'Vencida em ' + dataBR(c.validade_ate) : 'Válida até ' + dataBR(c.validade_ate || '') ) + '</span>' : '<span class="chip confirmar">Sem validade</span>';
+    const val = c.validade_ate ? '<span class="chip ' + (vencida ? 'erro' : 'confere') + '">' + (vencida ? 'Vencida em ' + dataBR(c.validade_ate) : 'Válida até ' + dataBR(c.validade_ate)) + '</span>'
+      : c.validade ? '<span class="chip confirmar" title="O documento informa a validade só em texto, sem uma data">Validade: ' + esc(c.validade) + '</span>'
+      : '<span class="chip confirmar">Sem validade</span>';
     const sug = descontoSugeridoOC(c, oc);
     const icms = mencionaICMS(c);
     return '<div class="card"><div class="k">' + esc(nomeForn(c.fornecedor_id)) + '</div>'
@@ -284,6 +286,7 @@ function htmlCards(oc, cots, tot) {
       + (sug ? '<button class="btn pq" data-acao="aplicar-desc-oc" data-id="' + esc(c.id) + '" data-v="' + sug + '">Aplicar desconto da OC (' + String(sug).replace('.', ',') + '%)</button>' : '')
       + (icms ? '<label>ICMS <select data-campo="cot-icms" data-id="' + esc(c.id) + '">' + ICMS_OPCOES.map(([v, t_]) => '<option value="' + v + '"' + (String(c.acrescimo_pct) === v || (c.acrescimo_pct === '' && v === '') ? ' selected' : '') + '>' + t_ + '</option>').join('') + '</select></label>'
         : '<label>Acréscimo % <input type="number" step="0.1" min="0" data-campo="cot-acr" data-id="' + esc(c.id) + '" value="' + esc(c.acrescimo_pct === '' || c.acrescimo_pct == null ? '' : c.acrescimo_pct) + '"></label>')
+      + (c.itens.some(i => i.item_oc_n !== '' && Number(i.fator_unidade) > 1) ? '<label title="Compra em embalagens inteiras (caixa, saco, kit): arredonda para cima e mostra as sobras"><input type="checkbox" data-campo="cot-emb" data-id="' + esc(c.id) + '"' + (c.embalagem_fechada !== false ? ' checked' : '') + '> embalagem fechada</label>' : '')
       + (Number(c.despesas) ? '<label><input type="checkbox" data-campo="cot-desp" data-id="' + esc(c.id) + '"' + (c.incluir_despesas !== false ? ' checked' : '') + '> incluir despesas</label>' : '')
       + '</div>'
       + '<div class="linha"><button class="btn pq" data-acao="ver-pdf" data-id="' + esc(c.id) + '">Ver PDF original</button><button class="btn pq" data-acao="recasar" data-id="' + esc(c.id) + '">Refazer casamento</button><button class="btn pq perigo" data-acao="cot-excluir" data-id="' + esc(c.id) + '">Excluir</button></div></div>';
@@ -320,7 +323,9 @@ function celula(oc, it, cot, melhor, difTxt) {
   const aj = [];
   if (Number(cot.desconto_pct)) aj.push('−' + String(cot.desconto_pct).replace('.', ',') + '%');
   if (Number(cot.acrescimo_pct)) aj.push('+' + String(cot.acrescimo_pct).replace('.', ',') + '%');
-  const calc = fator > 1 ? it.qtd + ' × ' + brl(lk.preco_unit) + ' ÷ ' + fator + ' = ' + it.qtd + ' × R$ ' + dec(base) + ' (' + esc(lk.un) + ')' : it.qtd + ' × ' + brl(lk.preco_unit) + ' (' + esc(lk.un) + ')';
+  const cx = caixas(cot, lk, it.qtd);
+  const calc = cx ? cx.caixas + ' emb. de ' + cx.fator + ' × ' + brl(lk.preco_unit) + ' = ' + cx.pecas + ' peças' + (cx.sobra > 0 ? ' (sobram ' + cx.sobra + ')' : '')
+    : fator > 1 ? it.qtd + ' × ' + brl(lk.preco_unit) + ' ÷ ' + fator + ' = ' + it.qtd + ' × R$ ' + dec(base) + ' (' + esc(lk.un) + ')' : it.qtd + ' × ' + brl(lk.preco_unit) + ' (' + esc(lk.un) + ')';
   const notas = String(lk.nota || '').split(' | ').filter(Boolean).map(n => '<div class="nota">' + esc(n) + '</div>').join('');
   const emb = lk.embalagem ? '<div class="nota">Embalagem: ' + esc(lk.embalagem) + '</div>' : '';
   const aceitar = lk.status === 'confirmar' ? '<button class="btn pq" data-acao="aceitar" data-id="' + esc(cot.id) + '" data-n="' + it.n + '">Aceitar vínculo</button>' : '';
@@ -362,6 +367,7 @@ function coletarAlertas(oc, cots) {
     const nome = esc(nomeForn(c.fornecedor_id));
     if (c.validade_ate && c.validade_ate < hoje()) add('Cotação vencida · ' + nome, 'A validade acabou em ' + dataBR(c.validade_ate) + ' (' + esc(c.validade) + '). Peça uma cotação nova antes de comprar.', 'erro');
     else if (!c.validade) add('Cotação sem validade · ' + nome, 'O documento não informa validade; confirme preço, prazo e estoque com o fornecedor.');
+    else if (!c.validade_ate) add('Validade sem data · ' + nome, 'O documento informa "' + esc(c.validade) + '", mas não uma data; confirme até quando o preço vale.');
     if (/Pz:|^\d+P\b/.test(c.pagamento || '')) add('Condição de pagamento em código · ' + nome, 'Está como "' + esc(c.pagamento) + '". Esclareça com o representante.');
     if (mencionaICMS(c) && c.acrescimo_pct === '') add('ICMS não escolhido · ' + nome, 'O preço vale para contribuinte do ICMS; para os demais soma-se um percentual por região. Escolha o cenário no cartão do fornecedor.');
     const conf = c.itens.filter(i => i.item_oc_n !== '' && i.status === 'confirmar');
@@ -370,6 +376,8 @@ function coletarAlertas(oc, cots) {
     if (dq.length) add('Quantidade cotada diferente da OC · ' + nome, dq.map(({ i, it }) => 'Item ' + it.n + ': OC pede ' + it.qtd + ', cotou ' + i.qtd_cotada).join('; ') + '. O preço pode mudar com o volume.');
     const kits = c.itens.filter(i => i.item_oc_n !== '' && Number(i.fator_unidade) > 1);
     if (kits.length) add('Embalagem com várias peças · ' + nome, kits.map(i => 'Item ' + i.item_oc_n + ': ' + esc(i.codigo) + ' vem em unidade com ' + i.fator_unidade + ' peças (preço dividido por ' + i.fator_unidade + ' no mapa)').join('; ') + '. Se a OC conta em unidades da embalagem, ajuste o fator na célula.');
+    const sobras = oc.itens.map(it => { const lk = linhaDe(c, it.n), cx = lk && caixas(c, lk, it.qtd); return cx && cx.sobra > 0 ? 'Item ' + it.n + ': ' + cx.caixas + ' emb. de ' + cx.fator + ' (sobram ' + cx.sobra + ' de ' + cx.pecas + ')' : null; }).filter(Boolean);
+    if (sobras.length) add('Embalagem fechada · ' + nome, sobras.join('; ') + '. O total já considera as embalagens inteiras; se o fornecedor vende avulso, desmarque "embalagem fechada" no cartão.');
     const sug = descontoSugeridoOC(c, oc);
     if (sug) add('Desconto da OC não aparece na cotação · ' + nome, 'A OC traz ' + brl(oc.desconto_total) + ' de desconto (cerca de ' + String(sug).replace('.', ',') + '%) e a cotação não. Confirme que o fornecedor o aceitou e aplique no cartão.');
   });
@@ -667,7 +675,7 @@ async function salvarCotacao() {
     const itens = linhasDe(d, res);
     const { id } = await Banco.salvarCotacao({
       cotacao: { oc_id: oc.id, fornecedor_id: fid, data_emissao: d.data_emissao || '', validade: d.validade || '', validade_ate: d.validade_ate || '', pagamento: d.pagamento || '',
-        frete: d.frete == null ? '' : d.frete, despesas: d.despesas_acessorias == null ? '' : d.despesas_acessorias, desconto_pct: '', acrescimo_pct: '', incluir_despesas: true,
+        frete: d.frete == null ? '' : d.frete, despesas: d.despesas_acessorias == null ? '' : d.despesas_acessorias, desconto_pct: '', acrescimo_pct: '', incluir_despesas: true, embalagem_fechada: true,
         observacoes: d.observacoes || [], total_documento: d.total_documento, tipo: d.tipo, arquivo_origem: r.nome || '' },
       itens
     });
@@ -836,8 +844,9 @@ document.addEventListener('click', async e => {
     else if (a === 'aceitar') await aceitar(id, n);
     else if (a === 'aplicar-desc-oc') await atualizarCot(id, { desconto_pct: Number(v) });
     else if (a === 'baixar-mapa') {
-      const oc = ocAtual(), r = ExportarMapa.baixar({ oc, cotacoes: S.cotacoes, nomeForn, alertas: alertasEmTexto(oc, S.cotacoes), hoje: hoje() });
-      aviso('Mapa exportado: ' + r.nomeArquivo + '.');
+      const oc = ocAtual(); aviso('Gerando o Excel…');
+      const r = await ExportarMapa.baixar({ oc, cotacoes: S.cotacoes, nomeForn, alertas: alertasEmTexto(oc, S.cotacoes), hoje: hoje() });
+      aviso('Mapa exportado: ' + r.nomeArquivo + (r.formatado ? '.' : ' (sem formatação: não foi possível carregar o gerador de Excel formatado).'));
     }
     else if (a === 'copiar-mapa') copiarMapa();
     else if (a === 'cot-excluir') { if (confirm('Excluir esta cotação?')) { await Banco.excluirCotacao(id); await recarregar(); render(); } }
@@ -861,6 +870,7 @@ document.addEventListener('change', async e => {
     else if (c === 'cot-acr') await atualizarCot(id, { acrescimo_pct: lerNum(el.value) });
     else if (c === 'cot-icms') await atualizarCot(id, { acrescimo_pct: el.value === '' ? '' : Number(el.value) });
     else if (c === 'cot-desp') await atualizarCot(id, { incluir_despesas: el.checked });
+    else if (c === 'cot-emb') await atualizarCot(id, { embalagem_fechada: el.checked });
     else if (c === 'fator') {
       const f = lerNum(el.value); if (!(f > 0)) return aviso('O fator deve ser maior que zero.');
       const cot = S.cotacoes.find(x => x.id === id);

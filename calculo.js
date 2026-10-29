@@ -13,10 +13,24 @@
   /** Linha da cotação ligada ao item n da OC (ou undefined). */
   const linhaDe = (cot, n) => cot.itens.find(i => Number(i.item_oc_n) === n);
 
+  /**
+   * Embalagem fechada: quando o item vem em caixa, saco ou kit (fator > 1) e a cotação não desligou a opção,
+   * compra-se em embalagens inteiras: ceil(qtd ÷ fator) embalagens. Devolve null se não se aplica.
+   * { caixas, fator, pecas (total comprado), sobra (peças além do pedido) }
+   */
+  function caixas(cot, lk, qtd) {
+    const fator = Number(lk.fator_unidade) || 1;
+    if (fator <= 1 || cot.embalagem_fechada === false) return null;
+    const n = Math.ceil(qtd / fator - 1e-9);
+    return { caixas: n, fator, pecas: r2(n * fator), sobra: r2(n * fator - qtd) };
+  }
+
   function custo(cot, lk, qtd) {
     const fator = Number(lk.fator_unidade) || 1;
     const f = (1 - (Number(cot.desconto_pct) || 0) / 100) * (1 + (Number(cot.acrescimo_pct) || 0) / 100);
-    return r2(qtd * (Number(lk.preco_unit) / fator) * f);
+    const cx = caixas(cot, lk, qtd);
+    if (cx) return r2(cx.caixas * Number(lk.preco_unit) * f);      // embalagens inteiras × preço da embalagem
+    return r2(qtd * (Number(lk.preco_unit) / fator) * f);          // por peça
   }
 
   function totalCot(cot, oc) {
@@ -37,7 +51,7 @@
     return { indice: custos.indexOf(min), valor: min };
   }
 
-  const api = { r2, linhaDe, custo, totalCot, menorPreco };
+  const api = { r2, linhaDe, caixas, custo, totalCot, menorPreco };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Calculo = api;
 })(typeof window !== 'undefined' ? window : this);
